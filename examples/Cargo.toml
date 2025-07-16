@@ -1,0 +1,62 @@
+[package]
+authors = ["Eric P. Simon <ericpsimon@gmail.com>"]
+description = "Example binaries for the Term data validation library."
+edition = "2021"
+name = "term-examples"
+version = "0.1.0"
+
+[dependencies]
+arrow = "55"
+datafusion = "48.0"
+opentelemetry = { version = "0.24", optional = true }
+opentelemetry_sdk = { version = "0.24", features = ["rt-tokio-current-thread", "testing"], optional = true }
+tracing-opentelemetry = { version = "0.25", optional = true }
+term-core = {path = "../term-core", features = ["all-cloud", "test-utils"]}
+tokio = { version = "1", features = ["full"] }
+tracing-subscriber = "0.3"
+
+[features]
+telemetry = ["term-core/telemetry", "opentelemetry", "opentelemetry_sdk", "tracing-opentelemetry"]
+test-utils = ["term-core/test-utils"]
+s3 = ["term-core/s3"]
+gcs = ["term-core/gcs"]
+azure = ["term-core/azure"]
+
+[[example]]
+name = "basic_validation"
+path = "src/basic_validation.rs"
+
+[[example]]
+name = "tpc_h_validation"
+path = "src/tpc_h_validation.rs"
+required-features = ["test-utils"]
+
+[[example]]
+name = "cloud_storage_example"
+path = "src/cloud_storage_example.rs"
+
+[[example]]
+name = "deequ_migration"
+path = "src/deequ_migration.rs"
+
+[[example]]
+name = "telemetry_example"
+path = "src/telemetry_example.rs"
+required-features = ["telemetry"]
+
+[[example]]
+name = "structured_logging_example"
+path = "src/structured_logging_example.rs"
+required-features = ["telemetry"]
+
+[[example]]
+name = "result_formatters_example"
+path = "src/result_formatters_example.rs"
+
+[[example]]
+name = "data_type_validation_example"
+path = "examples/data_type_validation_example.rs"
+
+[[example]]
+name = "column_count_example"
+path = "examples/column_count_example.rs"

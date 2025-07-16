@@ -1,0 +1,21 @@
+# cargo-audit configuration
+
+[advisories]
+# Ignore specific advisory IDs during audit
+# ignore = ["RUSTSEC-2020-0001"]
+
+# Warn for informational advisories
+informational_warnings = ["unmaintained", "unsound", "yanked"]
+
+# Exit with error if vulnerabilities with CVSS score greater than
+severity_threshold = "medium"
+
+[output]
+# Deny all warnings
+deny = ["warnings"]
+
+# Output format (terminal, json)
+format = "terminal"
+
+# Quiet mode
+quiet = false
