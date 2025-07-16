@@ -1,0 +1,57 @@
+# cargo-deny configuration
+
+# Main graph configuration
+[graph]
+# By default cargo-deny will consider all dependencies, this can be used to
+# remove certain dependencies from the checks, though this is generally not recommended
+targets = []
+
+[advisories]
+# The path where the advisory database is cloned/fetched into
+db-path = "~/.cargo/advisory-db"
+# The url(s) of the advisory databases to use
+db-urls = ["https://github.com/rustsec/advisory-db"]
+# Ignore specific advisory IDs (same as cargo-audit)
+ignore = [
+    "RUSTSEC-2024-0436", # paste - unmaintained (transitive dependency via datafusion/parquet)
+]
+
+[licenses]
+version = 2
+# Allow specific licenses
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "CC0-1.0",
+    "Zlib",
+]
+# The confidence threshold for detecting a license from license text.
+confidence-threshold = 0.8
+
+[[licenses.exceptions]]
+# Ring has a complicated license file, see https://github.com/briansmith/ring/blob/main/LICENSE
+allow = ["LicenseRef-ring", "MIT", "ISC", "OpenSSL"]
+name = "ring"
+
+[bans]
+# Lint level for when multiple versions of the same crate are detected
+multiple-versions = "warn"
+# Lint level for when a crate marked as 'deny' is detected
+deny = []
+# Skip certain crates when checking for duplicates
+skip = []
+# Similarly named crates that are allowed to coexist
+allow = []
+
+[sources]
+# Lint level for what to happen when a crate from a crate registry that is not in the allow list is detected
+unknown-registry = "warn"
+# Lint level for what to happen when a crate from a git repository that is not in the allow list is detected
+unknown-git = "allow"
+# List of allowed crate registries
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

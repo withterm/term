@@ -1,0 +1,20 @@
+# CODEOWNERS - Defines who must review changes to critical files
+
+# Default owners for everything
+* @withterm/maintainers
+
+# Security-critical files require admin approval
+/.github/workflows/ @withterm/admins
+/.github/CODEOWNERS @withterm/admins
+/Cargo.toml @withterm/admins @withterm/maintainers
+/Cargo.lock @withterm/maintainers
+
+# Source code requires maintainer review
+/src/ @withterm/maintainers
+/tests/ @withterm/maintainers
+/benches/ @withterm/maintainers
+
+# Documentation can be reviewed by any maintainer
+/docs/ @withterm/maintainers
+*.md @withterm/maintainers
+/README.md @withterm/maintainers

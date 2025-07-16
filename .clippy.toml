@@ -1,0 +1,10 @@
+# Clippy configuration to match CI environment
+warn-on-all-wildcard-imports = true
+
+# To catch uninlined_format_args locally, you need to enable it via:
+# 1. Command line: cargo clippy -- -W clippy::uninlined_format_args
+# 2. Or in your crate root (lib.rs/main.rs): #![warn(clippy::uninlined_format_args)]
+# 3. Or enable pedantic lints: cargo clippy -- -W clippy::pedantic
+
+# This setting allows mixed format args (some inline, some not) in the same macro
+allow-mixed-uninlined-format-args = false

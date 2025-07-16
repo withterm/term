@@ -1,0 +1,89 @@
+name: Security Checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  check-files:
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    name: security/files
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for binary files
+        run: |
+          # Get list of changed files
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          
+          # Check for binary files
+          BINARY_EXTENSIONS="exe dll so dylib wasm zip tar gz jar war ear"
+          FOUND_BINARIES=""
+          
+          for file in $CHANGED_FILES; do
+            for ext in $BINARY_EXTENSIONS; do
+              if [[ "$file" == *".$ext" ]]; then
+                FOUND_BINARIES="$FOUND_BINARIES\n- $file"
+              fi
+            done
+          done
+          
+          if [ ! -z "$FOUND_BINARIES" ]; then
+            echo "❌ Binary files detected in PR:"
+            echo -e "$FOUND_BINARIES"
+            exit 1
+          fi
+          
+          echo "✅ No binary files detected"
+
+      - name: Check file sizes
+        run: |
+          # Check for large files (>5MB)
+          LARGE_FILES=$(find . -type f -size +5M -not -path "./.git/*" | head -20)
+          
+          if [ ! -z "$LARGE_FILES" ]; then
+            echo "❌ Large files detected (>5MB):"
+            echo "$LARGE_FILES"
+            exit 1
+          fi
+          
+          echo "✅ No large files detected"
+
+      - name: Check critical file modifications
+        run: |
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          CRITICAL_FILES=".github/workflows .github/CODEOWNERS Cargo.toml"
+          FOUND_CRITICAL=""
+          
+          for file in $CHANGED_FILES; do
+            for critical in $CRITICAL_FILES; do
+              if [[ "$file" == *"$critical"* ]]; then
+                FOUND_CRITICAL="$FOUND_CRITICAL\n- $file"
+              fi
+            done
+          done
+          
+          if [ ! -z "$FOUND_CRITICAL" ]; then
+            echo "⚠️  Critical files modified - requires admin review:"
+            echo -e "$FOUND_CRITICAL"
+            # Don't fail, but require extra review
+          fi
+
+  secret-scan:
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    name: security/secrets
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
