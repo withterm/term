@@ -1,0 +1,209 @@
+name: Publish Release
+
+on:
+  release:
+    types: [published]
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  validate-release:
+    name: Validate Release
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    outputs:
+      version: ${{ steps.extract_version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Extract version from tag
+        id: extract_version
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          # Remove 'v' prefix if present
+          VERSION=${TAG#v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
+          # Validate version format
+          if ! echo "$VERSION" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Error: Tag must be in format vX.Y.Z or X.Y.Z"
+            exit 1
+          fi
+
+      - name: Check version in Cargo.toml
+        run: |
+          CARGO_VERSION=$(grep -E '^version = ' term-guard/Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+          if [ "$CARGO_VERSION" != "${{ steps.extract_version.outputs.version }}" ]; then
+            echo "Error: Version in Cargo.toml ($CARGO_VERSION) doesn't match tag version (${{ steps.extract_version.outputs.version }})"
+            echo "Please ensure term-guard/Cargo.toml version matches the release tag"
+            exit 1
+          fi
+
+      - name: Check CHANGELOG.md
+        run: |
+          if ! grep -q "## \[*${{ steps.extract_version.outputs.version }}\]" CHANGELOG.md; then
+            echo "Warning: No entry found for version ${{ steps.extract_version.outputs.version }} in CHANGELOG.md"
+            echo "Please ensure CHANGELOG.md contains release notes"
+          fi
+
+  pre-release-checks:
+    name: Pre-release Checks
+    needs: validate-release
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Run tests
+        run: cargo test --all-features
+
+      - name: Run clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Build documentation
+        run: cargo doc --no-deps --all-features
+
+      - name: Run examples
+        run: |
+          cargo run --example basic_validation
+          cargo run --example result_formatters_example
+          cargo run --example deequ_migration
+
+      - name: Dry-run publish
+        run: |
+          cd term-guard
+          cargo publish --dry-run
+
+  publish-crate:
+    name: Publish to crates.io
+    needs: [validate-release, pre-release-checks]
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 30
+    # Only run if this is not a pre-release
+    if: ${{ !github.event.release.prerelease }}
+    environment: production  # Requires manual approval
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Publish to crates.io
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          cd term-guard
+          cargo publish --token $CARGO_REGISTRY_TOKEN
+          
+          # Wait for crates.io to process
+          echo "Waiting for crates.io to process the publish..."
+          sleep 30
+
+      - name: Verify publication
+        run: |
+          # Check if the crate is available
+          VERSION="${{ needs.validate-release.outputs.version }}"
+          if curl -s https://crates.io/api/v1/crates/term-guard | grep -q "\"newest_version\":\"$VERSION\""; then
+            echo "✅ Successfully published term-guard v$VERSION to crates.io"
+          else
+            echo "⚠️ Warning: Could not verify publication immediately. It may take a few minutes."
+          fi
+
+  post-publish-summary:
+    name: Post-Publish Summary
+    needs: [validate-release, publish-crate]
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    if: ${{ !github.event.release.prerelease }}
+    steps:
+      - name: Create summary
+        run: |
+          VERSION="${{ needs.validate-release.outputs.version }}"
+          echo "# 🎉 Release Published Successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Term v$VERSION has been published to crates.io" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Package Links:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Crates.io**: https://crates.io/crates/term-guard/$VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "- **Docs.rs**: https://docs.rs/term-guard/$VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "- **GitHub Release**: https://github.com/${{ github.repository }}/releases/tag/v$VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📥 Installation:" >> $GITHUB_STEP_SUMMARY
+          echo '```toml' >> $GITHUB_STEP_SUMMARY
+          echo '[dependencies]' >> $GITHUB_STEP_SUMMARY
+          echo "term-guard = \"$VERSION\"" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ Next Steps:" >> $GITHUB_STEP_SUMMARY
+          echo "1. Verify installation: \`cargo install term-guard --version $VERSION\`" >> $GITHUB_STEP_SUMMARY
+          echo "2. Update dependent projects to use v$VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "3. Monitor for any issues in the first 24 hours" >> $GITHUB_STEP_SUMMARY
+          echo "4. Consider announcing the release if it includes significant features" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "View the full workflow run for detailed logs and timings." >> $GITHUB_STEP_SUMMARY
+
+  handle-prerelease:
+    name: Handle Pre-release
+    needs: [validate-release, pre-release-checks]
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    if: ${{ github.event.release.prerelease }}
+    steps:
+      - name: Update pre-release notes
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const version = "${{ needs.validate-release.outputs.version }}";
+            const currentBody = context.payload.release.body || '';
+            
+            // Add pre-release notice
+            const updateText = `
+            
+            ---
+            ### ⚠️ Pre-release Notice
+            
+            This is a pre-release version and will not be published to crates.io.
+            
+            To test this version:
+            1. Clone the repository at tag v${version}
+            2. Use as a git dependency:
+            
+            \`\`\`toml
+            [dependencies]
+            term-guard = { git = "https://github.com/${context.repo.owner}/${context.repo.repo}", tag = "v${version}" }
+            \`\`\`
+            `;
+            
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: context.payload.release.id,
+              body: currentBody + updateText
+            });
+
+      - name: Create pre-release summary
+        run: |
+          VERSION="${{ needs.validate-release.outputs.version }}"
+          echo "# Pre-release Created! 🚧" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Term v$VERSION (Pre-release)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "This pre-release has been validated but not published to crates.io." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All checks passed ✅" >> $GITHUB_STEP_SUMMARY

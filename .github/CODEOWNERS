@@ -1,0 +1,19 @@
+# CODEOWNERS file for Term project
+# This file defines who is responsible for code in this repository
+
+# Default owners for everything in the repo
+* @ericpsimon
+
+# GitHub Actions workflows require special review
+# CRITICAL: Workflow files need extra scrutiny to prevent CI/CD abuse
+.github/workflows/ @ericpsimon
+
+# Security-sensitive files
+deny.toml @ericpsimon
+Cargo.toml @ericpsimon
+Cargo.lock @ericpsimon
+rust-toolchain.toml @ericpsimon
+
+# Documentation
+*.md @ericpsimon
+docs/ @ericpsimon
