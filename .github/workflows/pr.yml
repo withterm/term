@@ -1,0 +1,52 @@
+name: PR Validation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+# Prevent concurrent builds from the same PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Minimal permissions by default
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+  RUST_BACKTRACE: 1
+
+jobs:
+  validate:
+    name: PR Validation
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 30  # Prevent runaway jobs
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+          cache-key: "cache-pr-validation"
+      
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      
+      - name: Run clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+      
+      - name: Run tests
+        run: cargo test --all-features
+      
+      - name: Setup Rust (MSRV)
+        uses: ./.github/actions/setup-rust
+        with:
+          toolchain: 1.70.0
+          cache-key: "cache-pr-msrv"
+      
+      - name: MSRV check
+        run: cargo check --all-features

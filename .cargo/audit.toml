@@ -1,0 +1,26 @@
+# cargo-audit configuration
+
+[advisories]
+# Ignore specific advisory IDs during audit
+ignore = [
+    "RUSTSEC-2024-0436", # paste - unmaintained (transitive dependency via datafusion/parquet)
+    "RUSTSEC-2025-0017", # trust-dns rebranded to hickory-dns (transitive via datafusion-table-providers)
+    "RUSTSEC-2024-0421", # idna 0.4.0 - Punycode vulnerability (transitive via datafusion-table-providers -> trust-dns-resolver)
+    # TODO: Remove these ignores once datafusion-table-providers updates to hickory-dns and idna >= 1.0.0
+]
+
+# Warn for informational advisories
+informational_warnings = ["unmaintained", "unsound", "yanked"]
+
+# Exit with error if vulnerabilities with CVSS score greater than
+severity_threshold = "medium"
+
+[output]
+# Deny all warnings
+deny = ["warnings"]
+
+# Output format (terminal, json)
+format = "terminal"
+
+# Quiet mode
+quiet = false

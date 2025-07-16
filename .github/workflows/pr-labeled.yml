@@ -1,0 +1,81 @@
+name: PR Tests (Labeled)
+
+# This workflow runs tests on PRs from forks after manual approval
+# via the 'safe-to-test' label
+
+on:
+  pull_request:
+    types: [labeled]
+
+# Prevent concurrent builds from the same PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Minimal permissions by default
+permissions:
+  contents: read
+  checks: write
+  statuses: write
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+  RUST_BACKTRACE: 1
+
+jobs:
+  # Run full test suite when 'safe-to-test' label is added
+  test-fork:
+    name: Test Fork PR
+    if: |
+      github.event.label.name == 'safe-to-test' &&
+      github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+          cache-key: "cache-fork-pr"
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Run tests
+        run: cargo test --all-features
+
+      - name: Run integration tests
+        run: cargo integration
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        if: success()
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '✅ All tests passed for commit ${{ github.event.pull_request.head.sha }}'
+            })
+
+      - name: Comment on PR (failure)
+        uses: actions/github-script@v7
+        if: failure()
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '❌ Tests failed for commit ${{ github.event.pull_request.head.sha }}. Please check the workflow logs.'
+            })

@@ -1,0 +1,40 @@
+[alias]
+integration = [
+  "test",
+  "--features",
+  "test-utils",
+  "--test",
+  "integration_test_suite",
+  "--test",
+  "completeness_integration",
+  "--test",
+  "context_integration",
+  "--test",
+  "data_type_integration",
+  "--test",
+  "distinctness_integration",
+  "--test",
+  "exact_quantile_integration",
+  "--test",
+  "histogram_integration",
+  "--test",
+  "optimizer_integration",
+  "--test",
+  "sources_integration",
+  "--test",
+  "string_length_integration",
+  "--test",
+  "unique_value_ratio_integration",
+  "--test",
+  "column_count_integration",
+  "--test",
+  "approx_count_distinct_integration",
+]
+
+# Match CI environment settings
+[build]
+jobs = 4  # Match CI vCPU count
+rustflags = ["-D", "warnings"]
+
+[term]
+color = "always"

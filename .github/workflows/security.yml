@@ -1,0 +1,165 @@
+name: Security Audit
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run security audit daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+permissions:
+  # Allow access to commit list
+  contents: read
+  # Allow access to adding comments
+  discussions: write
+  pull-requests: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  security-audit:
+    name: Security Audit
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Cache cargo registry
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Cache cargo index
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
+      
+      - name: Run security audit
+        run: cargo audit
+      
+      - name: Check for vulnerable dependencies
+        run: |
+          if cargo audit --json | jq -e '.vulnerabilities.list | length > 0'; then
+            echo "❌ Found vulnerable dependencies!"
+            cargo audit
+            exit 1
+          else
+            echo "✅ No known vulnerabilities found"
+          fi
+
+  dependency-review:
+    name: Dependency Review
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Install cargo-deny
+        run: cargo install cargo-deny
+      
+      - name: Check licenses
+        run: |
+          echo "Checking for denied licenses (GPL-3.0, AGPL-3.0 are implicitly denied)..."
+          cargo deny check licenses
+      
+      - name: Check banned dependencies
+        run: cargo deny check bans
+      
+      - name: Check security advisories
+        run: cargo deny check advisories
+
+
+  file-checks:
+    name: File Security Checks
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for binary files
+        run: |
+          # Get list of changed files
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          
+          # Check for binary files
+          BINARY_EXTENSIONS="exe dll so dylib wasm zip tar gz jar war ear"
+          FOUND_BINARIES=""
+          
+          for file in $CHANGED_FILES; do
+            for ext in $BINARY_EXTENSIONS; do
+              if [[ "$file" == *".$ext" ]]; then
+                FOUND_BINARIES="$FOUND_BINARIES\n- $file"
+              fi
+            done
+          done
+          
+          if [ ! -z "$FOUND_BINARIES" ]; then
+            echo "❌ Binary files detected in PR:"
+            echo -e "$FOUND_BINARIES"
+            exit 1
+          fi
+          
+          echo "✅ No binary files detected"
+
+      - name: Check file sizes
+        run: |
+          # Check for large files (>5MB)
+          LARGE_FILES=$(find . -type f -size +5M -not -path "./.git/*" | head -20)
+          
+          if [ ! -z "$LARGE_FILES" ]; then
+            echo "❌ Large files detected (>5MB):"
+            echo "$LARGE_FILES"
+            exit 1
+          fi
+          
+          echo "✅ No large files detected"
+
+      - name: Check critical file modifications
+        run: |
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          CRITICAL_FILES=".github/workflows .github/CODEOWNERS Cargo.toml"
+          FOUND_CRITICAL=""
+          
+          for file in $CHANGED_FILES; do
+            for critical in $CRITICAL_FILES; do
+              if [[ "$file" == *"$critical"* ]]; then
+                FOUND_CRITICAL="$FOUND_CRITICAL\n- $file"
+              fi
+            done
+          done
+          
+          if [ ! -z "$FOUND_CRITICAL" ]; then
+            echo "⚠️  Critical files modified - requires admin review:"
+            echo -e "$FOUND_CRITICAL"
+            # Don't fail, but require extra review
+          fi
+
+  secret-scanning:
+    name: Secret Scanning
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Run GitLeaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
