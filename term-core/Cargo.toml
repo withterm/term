@@ -1,0 +1,82 @@
+[package]
+name = "term-core"
+version = "0.0.1"
+authors = ["Eric P. Simon <ericpsimon@gmail.com>"]
+edition = "2021"
+rust-version = "1.70"
+description = "A Rust data validation library providing Deequ-like capabilities without Spark dependencies"
+documentation = "https://docs.rs/term-core"
+homepage = "https://github.com/term/term"
+repository = "https://github.com/term/term"
+readme = "../README.md"
+keywords = ["data-validation", "data-quality", "datafusion", "arrow", "deequ"]
+categories = ["database", "data-structures", "asynchronous"]
+license = "MIT"
+exclude = [
+    "tests/*",
+    "benches/*",
+    ".github/*",
+    ".gitignore",
+    "CLAUDE.md",
+]
+
+[features]
+default = []
+# Database features temporarily disabled until datafusion-table-providers is on crates.io
+# database = ["dep:datafusion-table-providers"]
+# postgres = ["database", "datafusion-table-providers/postgres"]
+# mysql = ["database", "datafusion-table-providers/mysql"]
+# sqlite = ["database", "datafusion-table-providers/sqlite"]
+# all-databases = ["postgres", "mysql", "sqlite"]
+cloud-storage = ["dep:object_store", "dep:url"]
+s3 = ["cloud-storage", "object_store/aws"]
+gcs = ["cloud-storage", "object_store/gcp"]
+azure = ["cloud-storage", "object_store/azure"]
+all-cloud = ["s3", "gcs", "azure"]
+telemetry = ["dep:tracing-opentelemetry", "dep:opentelemetry", "dep:opentelemetry_sdk"]
+test-utils = ["dep:rand"]
+
+[dependencies]
+arrow = "55.0"
+async-trait = "0.1"
+chrono = { version = "0.4", features = ["serde"] }
+datafusion = "48.0"
+# datafusion-table-providers = { git = "https://github.com/datafusion-contrib/datafusion-table-providers.git", branch = "main", optional = true }
+# TODO: Replace with crates.io version when available
+glob = "0.3"
+once_cell = "1.18"
+object_store = { version = "0.12", optional = true }
+opentelemetry = { version = "0.24", optional = true }
+opentelemetry_sdk = { version = "0.24", optional = true }
+rand = { version = "0.8", optional = true }
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+tokio = {version = "1", features = ["full"]}
+tracing = "0.1"
+tracing-opentelemetry = { version = "0.25", optional = true }
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
+url = { version = "2", optional = true }
+zeroize = { version = "1.8", features = ["derive"] }
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+parquet = "55.0"
+proptest = "1.6"
+rand = "0.8"
+serde_json = "1"
+tempfile = "3"
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
+
+[[bench]]
+name = "optimizer_bench"
+harness = false
+
+[[bench]]
+name = "unified_constraints_bench"
+harness = false
+
+[[bench]]
+name = "unified_constraints_quick_bench"
+harness = false
