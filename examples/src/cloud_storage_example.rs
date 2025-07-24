@@ -255,7 +255,7 @@ fn display_validation_result(result: &term_core::core::ValidationResult) {
         for issue in &report.issues {
             println!("    - {}: {}", issue.constraint_name, issue.message);
             if let Some(metric) = issue.metric {
-                println!("      Metric: {:.4}", metric);
+                println!("      Metric: {metric:.4}");
             }
         }
     }

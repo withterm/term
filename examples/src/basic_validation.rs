@@ -108,7 +108,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Display results
     println!("Validation Suite: {}", suite.name());
     if let Some(desc) = suite.description() {
-        println!("Description: {}", desc);
+        println!("Description: {desc}");
     }
     println!("\n{}", "=".repeat(60));
 
@@ -137,11 +137,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Level::Info => "🔵",
             };
             println!(
-                "{} [{}] {}.{}: {}",
-                icon, issue.level, issue.check_name, issue.constraint_name, issue.message
+                "{icon} [{}] {}.{}: {}",
+                issue.level, issue.check_name, issue.constraint_name, issue.message
             );
             if let Some(metric) = issue.metric {
-                println!("    Metric value: {:.4}", metric);
+                println!("    Metric value: {metric:.4}");
             }
         }
     }
@@ -150,7 +150,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if !report.metrics.custom_metrics.is_empty() {
         println!("\nCustom Metrics:");
         for (name, value) in &report.metrics.custom_metrics {
-            println!("  {}: {:.4}", name, value);
+            println!("  {name}: {value:.4}");
         }
     }
 

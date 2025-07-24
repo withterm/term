@@ -194,7 +194,7 @@ mod combiner_tests {
 
         // Create 5 combinable constraints for same table
         let analyses: Vec<_> = (0..5)
-            .map(|i| create_test_analysis(&format!("c{}", i), "data", true))
+            .map(|i| create_test_analysis(&format!("c{i}"), "data", true))
             .collect();
 
         let groups = combiner.group_constraints(analyses).unwrap();

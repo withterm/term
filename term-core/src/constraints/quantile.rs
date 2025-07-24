@@ -229,8 +229,7 @@ impl QuantileConstraint {
     fn approx_quantile_sql(&self, quantile: f64) -> Result<String> {
         let escaped_column = SqlSecurity::escape_identifier(&self.column)?;
         Ok(format!(
-            "APPROX_PERCENTILE_CONT({}) WITHIN GROUP (ORDER BY {})",
-            quantile, escaped_column
+            "APPROX_PERCENTILE_CONT({quantile}) WITHIN GROUP (ORDER BY {escaped_column})"
         ))
     }
 
@@ -260,7 +259,9 @@ impl QuantileConstraint {
                     .column(0)
                     .as_any()
                     .downcast_ref::<arrow::array::Int64Array>()
-                    .unwrap()
+                    .ok_or_else(|| {
+                        TermError::Internal("Failed to downcast to Int64Array".to_string())
+                    })?
                     .value(0) as usize;
 
                 Ok(count <= *threshold)
@@ -319,8 +320,8 @@ impl Constraint for QuantileConstraint {
                     Ok(ConstraintResult::failure_with_metric(
                         value,
                         format!(
-                            "Quantile {} is {} which does not {}",
-                            check.quantile, value, check.assertion
+                            "Quantile {} is {value} which does not {}",
+                            check.quantile, check.assertion
                         ),
                     ))
                 }
@@ -332,12 +333,13 @@ impl Constraint for QuantileConstraint {
                     .enumerate()
                     .map(|(i, check)| {
                         // Always use approx for now since DataFusion doesn't support exact percentile_cont
-                        let q_sql = self.approx_quantile_sql(check.quantile).unwrap();
-                        format!("{} as q_{}", q_sql, i)
+                        self.approx_quantile_sql(check.quantile)
+                            .map(|q_sql| format!("{q_sql} as q_{i}"))
                     })
-                    .collect();
+                    .collect::<Result<Vec<_>>>()?;
 
-                let sql = format!("SELECT {} FROM data", sql_parts.join(", "));
+                let parts = sql_parts.join(", ");
+                let sql = format!("SELECT {parts} FROM data");
                 let df = ctx.sql(&sql).await?;
                 let batches = df.collect().await?;
 
@@ -370,10 +372,9 @@ impl Constraint for QuantileConstraint {
                     };
 
                     if !check.assertion.evaluate(value) {
+                        let q_pct = (check.quantile * 100.0) as i32;
                         failures.push(format!(
-                            "Q{} is {} which does not {}",
-                            (check.quantile * 100.0) as i32,
-                            value,
+                            "Q{q_pct} is {value} which does not {}",
                             check.assertion
                         ));
                     }
@@ -392,12 +393,13 @@ impl Constraint for QuantileConstraint {
                     .enumerate()
                     .map(|(i, q)| {
                         // Always use approx for now since DataFusion doesn't support exact percentile_cont
-                        let q_sql = self.approx_quantile_sql(*q).unwrap();
-                        format!("{} as q_{}", q_sql, i)
+                        self.approx_quantile_sql(*q)
+                            .map(|q_sql| format!("{q_sql} as q_{i}"))
                     })
-                    .collect();
+                    .collect::<Result<Vec<_>>>()?;
 
-                let sql = format!("SELECT {} FROM data", sql_parts.join(", "));
+                let parts = sql_parts.join(", ");
+                let sql = format!("SELECT {parts} FROM data");
                 let df = ctx.sql(&sql).await?;
                 let batches = df.collect().await?;
 
@@ -448,10 +450,9 @@ impl Constraint for QuantileConstraint {
                 if is_monotonic {
                     Ok(ConstraintResult::success())
                 } else {
+                    let monotonic_type = if *strict { "strictly" } else { "" };
                     Ok(ConstraintResult::failure(format!(
-                        "Quantiles are not {} monotonic: {:?}",
-                        if *strict { "strictly" } else { "" },
-                        values
+                        "Quantiles are not {monotonic_type} monotonic: {values:?}"
                     )))
                 }
             }

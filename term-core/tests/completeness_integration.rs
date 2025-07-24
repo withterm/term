@@ -416,10 +416,7 @@ async fn test_unified_completeness_performance_comparison() {
     let duration = start.elapsed();
 
     assert!(results.is_success());
-    println!(
-        "Unified completeness constraint execution time: {:?}",
-        duration
-    );
+    println!("Unified completeness constraint execution time: {duration:?}");
 
     // The execution should be reasonably fast (under 1 second for SF0.1)
     assert!(duration.as_secs() < 1);

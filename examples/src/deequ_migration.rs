@@ -333,7 +333,7 @@ fn display_validation_result(result: &term_core::core::ValidationResult) {
         for issue in &report.issues {
             println!("    - {}: {}", issue.constraint_name, issue.message);
             if let Some(metric) = issue.metric {
-                println!("      Metric: {:.4}", metric);
+                println!("      Metric: {metric:.4}");
             }
         }
     }
@@ -341,7 +341,7 @@ fn display_validation_result(result: &term_core::core::ValidationResult) {
     if !report.metrics.custom_metrics.is_empty() {
         println!("\n  Metrics:");
         for (name, value) in &report.metrics.custom_metrics {
-            println!("    {}: {:.4}", name, value);
+            println!("    {name}: {value:.4}");
         }
     }
 }

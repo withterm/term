@@ -154,9 +154,8 @@ impl UnifiedConstraint for CompletenessConstraint {
         let sql = format!(
             "SELECT 
                 COUNT(*) as total_count,
-                COUNT({}) as non_null_count
-             FROM data",
-            column_identifier
+                COUNT({column_identifier}) as non_null_count
+             FROM data"
         );
 
         // Execute query
@@ -213,7 +212,7 @@ impl UnifiedConstraint for CompletenessConstraint {
                 constraint.name = %self.name(),
                 constraint.column = %column,
                 constraint.threshold = %self.threshold,
-                result.completeness = %format!("{:.4}", completeness),
+                result.completeness = %format!("{completeness:.4}"),
                 result.non_null_count = non_null_count as i64,
                 result.total_count = total_count as i64,
                 result.status = "success",
@@ -225,7 +224,7 @@ impl UnifiedConstraint for CompletenessConstraint {
                 constraint.name = %self.name(),
                 constraint.column = %column,
                 constraint.threshold = %self.threshold,
-                result.completeness = %format!("{:.4}", completeness),
+                result.completeness = %format!("{completeness:.4}"),
                 result.non_null_count = non_null_count as i64,
                 result.total_count = total_count as i64,
                 result.status = "failure",
@@ -234,8 +233,7 @@ impl UnifiedConstraint for CompletenessConstraint {
             Ok(ConstraintResult::failure_with_metric(
                 completeness,
                 format!(
-                    "Column '{}' completeness {:.2}% is below threshold {:.2}%",
-                    column,
+                    "Column '{column}' completeness {:.2}% is below threshold {:.2}%",
                     completeness * 100.0,
                     self.threshold * 100.0
                 ),
@@ -274,12 +272,11 @@ impl Constraint for CompletenessConstraint {
 
         metadata = metadata
             .with_description(format!(
-                "Checks that {}{} have at least {:.1}% completeness",
+                "Checks that {}{operator_desc} have at least {:.1}% completeness",
                 match &self.columns {
                     ColumnSpec::Single(_) => "column",
                     ColumnSpec::Multiple(_) => "columns",
                 },
-                operator_desc,
                 self.threshold * 100.0
             ))
             .with_custom("threshold", self.threshold.to_string())

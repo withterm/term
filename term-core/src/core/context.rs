@@ -418,7 +418,7 @@ mod tests {
 
         // Register multiple tables
         for i in 0..3 {
-            let name = format!("table{}", i);
+            let name = format!("table{i}");
             let schema = Arc::new(Schema::new(vec![Field::new("id", DataType::Int64, false)]));
             let batch =
                 RecordBatch::try_new(schema.clone(), vec![Arc::new(Int64Array::from(vec![i]))])

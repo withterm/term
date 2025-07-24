@@ -5,8 +5,15 @@ use crate::prelude::*;
 use crate::security::SqlSecurity;
 use async_trait::async_trait;
 use datafusion::prelude::*;
-use std::collections::HashSet;
+use once_cell::sync::Lazy;
+use regex::Regex;
+use std::collections::{HashMap, HashSet};
+use std::sync::RwLock;
 use tracing::instrument;
+
+/// Cache for compiled regex patterns to avoid recompiling
+static REGEX_CACHE: Lazy<RwLock<HashMap<String, Regex>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
 
 /// A constraint that evaluates custom SQL expressions.
 ///
@@ -130,11 +137,36 @@ fn validate_sql_expression(sql: &str) -> Result<()> {
     // Check for dangerous keywords
     for keyword in dangerous_keywords {
         // Use word boundaries to avoid false positives (e.g., "UPDATE" in "UPDATED_AT")
-        let pattern = format!(r"\b{}\b", keyword);
-        if regex::Regex::new(&pattern).unwrap().is_match(&sql_upper) {
+        let pattern = format!(r"\b{keyword}\b");
+
+        // Check cache first
+        let matches = {
+            let cache = REGEX_CACHE.read().map_err(|_| {
+                TermError::Internal("Failed to acquire read lock on regex cache".to_string())
+            })?;
+
+            if let Some(regex) = cache.get(&pattern) {
+                regex.is_match(&sql_upper)
+            } else {
+                // Need to compile and cache the regex
+                drop(cache);
+                let mut write_cache = REGEX_CACHE.write().map_err(|_| {
+                    TermError::Internal("Failed to acquire write lock on regex cache".to_string())
+                })?;
+
+                let regex = Regex::new(&pattern).map_err(|e| {
+                    TermError::Internal(format!("Failed to compile regex pattern: {e}"))
+                })?;
+                let is_match = regex.is_match(&sql_upper);
+                write_cache.insert(pattern.clone(), regex);
+                is_match
+            }
+        };
+
+        if matches {
             return Err(TermError::validation_failed(
                 "custom_sql",
-                format!("SQL expression contains forbidden operation: {}", keyword),
+                format!("SQL expression contains forbidden operation: {keyword}"),
             ));
         }
     }
@@ -177,8 +209,8 @@ impl Constraint for CustomSqlConstraint {
             Err(e) => {
                 // Return a clear error message for SQL errors
                 return Ok(ConstraintResult::failure(format!(
-                    "SQL expression error: {}. Expression: '{}'",
-                    e, self.expression
+                    "SQL expression error: {e}. Expression: '{}'",
+                    self.expression
                 )));
             }
         };
@@ -188,8 +220,8 @@ impl Constraint for CustomSqlConstraint {
             Err(e) => {
                 // Return a clear error message for execution errors
                 return Ok(ConstraintResult::failure(format!(
-                    "SQL execution error: {}. Expression: '{}'",
-                    e, self.expression
+                    "SQL execution error: {e}. Expression: '{}'",
+                    self.expression
                 )));
             }
         };
@@ -229,10 +261,7 @@ impl Constraint for CustomSqlConstraint {
         } else {
             let failed_count = total - satisfied;
             let message = if let Some(hint) = &self.hint {
-                format!(
-                    "{} ({} rows failed the condition)",
-                    hint, failed_count as i64
-                )
+                format!("{hint} ({} rows failed the condition)", failed_count as i64)
             } else {
                 format!(
                     "Custom SQL condition not satisfied for {} rows. Expression: '{}'",

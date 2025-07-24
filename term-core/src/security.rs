@@ -4,6 +4,7 @@
 //! validate inputs, and handle credentials securely.
 
 use crate::error::{Result, TermError};
+use once_cell::sync::Lazy;
 use regex::Regex;
 use std::collections::HashSet;
 use std::sync::OnceLock;
@@ -91,7 +92,7 @@ impl SqlSecurity {
 
         // Escape the identifier using double quotes and escape any internal double quotes
         let escaped = identifier.replace('"', "\"\"");
-        Ok(format!("\"{}\"", escaped))
+        Ok(format!("\"{escaped}\""))
     }
 
     /// Validates a SQL identifier without escaping it.
@@ -122,17 +123,19 @@ impl SqlSecurity {
         }
 
         // Validate identifier format using regex
-        static IDENTIFIER_REGEX: OnceLock<Regex> = OnceLock::new();
-        let regex = IDENTIFIER_REGEX.get_or_init(|| {
+        static IDENTIFIER_REGEX: Lazy<Regex> = Lazy::new(|| {
             // Allow letters, numbers, underscores, dots (for qualified names), and quotes
             // Must start with letter or underscore (or quote for quoted identifiers)
-            Regex::new(r#"^[a-zA-Z_"][a-zA-Z0-9_"]*(\.[a-zA-Z_"][a-zA-Z0-9_"]*)*$"#).unwrap()
+            // This regex is compile-time constant and known to be valid
+            #[allow(clippy::expect_used)]
+            Regex::new(r#"^[a-zA-Z_"][a-zA-Z0-9_"]*(\.[a-zA-Z_"][a-zA-Z0-9_"]*)*$"#)
+                .expect("Hard-coded regex pattern should be valid")
         });
+        let regex = &*IDENTIFIER_REGEX;
 
         if !regex.is_match(identifier) {
             return Err(TermError::SecurityError(format!(
-                "Invalid SQL identifier format: '{}'. Identifiers must start with a letter or underscore and contain only letters, numbers, underscores, and dots",
-                identifier
+                "Invalid SQL identifier format: '{identifier}'. Identifiers must start with a letter or underscore and contain only letters, numbers, underscores, and dots"
             )));
         }
 
@@ -166,8 +169,7 @@ impl SqlSecurity {
             Ok(_) => (),
             Err(e) => {
                 return Err(TermError::SecurityError(format!(
-                    "Invalid regex pattern: {}",
-                    e
+                    "Invalid regex pattern: {e}"
                 )));
             }
         }
@@ -220,8 +222,7 @@ impl SqlSecurity {
         for pattern in dangerous_patterns {
             if identifier_lower.contains(pattern) {
                 return Err(TermError::SecurityError(format!(
-                    "SQL identifier contains dangerous pattern: '{}'",
-                    pattern
+                    "SQL identifier contains dangerous pattern: '{pattern}'"
                 )));
             }
         }
@@ -311,8 +312,7 @@ impl SqlSecurity {
         for keyword in keywords {
             if expression_lower.contains(keyword) {
                 return Err(TermError::SecurityError(format!(
-                    "SQL expression contains dangerous keyword: '{}'",
-                    keyword
+                    "SQL expression contains dangerous keyword: '{keyword}'"
                 )));
             }
         }
@@ -332,8 +332,7 @@ impl SqlSecurity {
             if let Ok(regex) = Regex::new(pattern) {
                 if regex.is_match(&expression_lower) {
                     return Err(TermError::SecurityError(format!(
-                        "SQL expression contains suspicious pattern matching: {}",
-                        pattern
+                        "SQL expression contains suspicious pattern matching: {pattern}"
                     )));
                 }
             }
@@ -351,8 +350,7 @@ impl InputValidator {
     pub fn validate_threshold(value: f64, name: &str) -> Result<()> {
         if !value.is_finite() {
             return Err(TermError::SecurityError(format!(
-                "Invalid {} value: must be finite (not NaN or infinite)",
-                name
+                "Invalid {name} value: must be finite (not NaN or infinite)"
             )));
         }
         Ok(())
@@ -364,8 +362,7 @@ impl InputValidator {
 
         if !(0.0..=1.0).contains(&value) {
             return Err(TermError::SecurityError(format!(
-                "Invalid {} value: must be between 0.0 and 1.0, got {}",
-                name, value
+                "Invalid {name} value: must be between 0.0 and 1.0, got {value}"
             )));
         }
         Ok(())
@@ -375,10 +372,8 @@ impl InputValidator {
     pub fn validate_string_length(value: &str, max_length: usize, name: &str) -> Result<()> {
         if value.len() > max_length {
             return Err(TermError::SecurityError(format!(
-                "{} too long: {} characters (max {})",
-                name,
-                value.len(),
-                max_length
+                "{name} too long: {} characters (max {max_length})",
+                value.len()
             )));
         }
         Ok(())
@@ -388,8 +383,7 @@ impl InputValidator {
     pub fn validate_no_null_bytes(value: &str, name: &str) -> Result<()> {
         if value.contains('\0') {
             return Err(TermError::SecurityError(format!(
-                "{} cannot contain null bytes",
-                name
+                "{name} cannot contain null bytes"
             )));
         }
         Ok(())

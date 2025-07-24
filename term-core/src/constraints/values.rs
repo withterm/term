@@ -107,11 +107,11 @@ impl Constraint for DataTypeConstraint {
 
         let sql = format!(
             "SELECT 
-                COUNT(CASE WHEN {} ~ '{}' THEN 1 END) as matches,
+                COUNT(CASE WHEN {} ~ '{pattern}' THEN 1 END) as matches,
                 COUNT(*) as total
              FROM data
              WHERE {} IS NOT NULL",
-            self.column, pattern, self.column
+            self.column, self.column
         );
 
         let df = ctx.sql(&sql).await?;
@@ -152,8 +152,8 @@ impl Constraint for DataTypeConstraint {
             Ok(ConstraintResult::failure_with_metric(
                 type_ratio,
                 format!(
-                    "Data type conformance {} is below threshold {}",
-                    type_ratio, self.threshold
+                    "Data type conformance {type_ratio} is below threshold {}",
+                    self.threshold
                 ),
             ))
         }
@@ -235,11 +235,11 @@ impl Constraint for ContainmentConstraint {
 
         let sql = format!(
             "SELECT 
-                COUNT(CASE WHEN {} IN ({}) THEN 1 END) as valid_values,
+                COUNT(CASE WHEN {} IN ({values_list}) THEN 1 END) as valid_values,
                 COUNT(*) as total
              FROM data
              WHERE {} IS NOT NULL",
-            self.column, values_list, self.column
+            self.column, self.column
         );
 
         let df = ctx.sql(&sql).await?;
@@ -280,7 +280,7 @@ impl Constraint for ContainmentConstraint {
             let invalid_count = total - valid_values;
             Ok(ConstraintResult::failure_with_metric(
                 containment_ratio,
-                format!("{} values are not in the allowed set", invalid_count as i64),
+                format!("{invalid_count} values are not in the allowed set"),
             ))
         }
     }
@@ -394,7 +394,7 @@ impl Constraint for NonNegativeConstraint {
             let negative_count = total - non_negative;
             Ok(ConstraintResult::failure_with_metric(
                 non_negative_ratio,
-                format!("{} values are negative", negative_count as i64),
+                format!("{negative_count} values are negative"),
             ))
         }
     }

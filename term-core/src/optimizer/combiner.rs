@@ -198,26 +198,29 @@ impl QueryCombiner {
                     constraint.columns[0].clone() // Simplified
                 };
 
-                let alias = format!("{}_{}_{}_{}", constraint.name, i, agg_to_sql(agg), j);
+                let agg_sql = agg_to_sql(agg);
+                let alias = format!("{}_{i}_{agg_sql}_{j}", constraint.name);
                 let sql_expr = match agg {
                     AggregationType::CountDistinct => {
-                        format!("COUNT(DISTINCT {}) as {}", col_name, alias)
+                        format!("COUNT(DISTINCT {col_name}) as {alias}")
                     }
-                    AggregationType::Sum => format!("SUM({}) as {}", col_name, alias),
-                    AggregationType::Avg => format!("AVG({}) as {}", col_name, alias),
-                    AggregationType::Min => format!("MIN({}) as {}", col_name, alias),
-                    AggregationType::Max => format!("MAX({}) as {}", col_name, alias),
-                    AggregationType::StdDev => format!("STDDEV({}) as {}", col_name, alias),
-                    AggregationType::Variance => format!("VARIANCE({}) as {}", col_name, alias),
+                    AggregationType::Sum => format!("SUM({col_name}) as {alias}"),
+                    AggregationType::Avg => format!("AVG({col_name}) as {alias}"),
+                    AggregationType::Min => format!("MIN({col_name}) as {alias}"),
+                    AggregationType::Max => format!("MAX({col_name}) as {alias}"),
+                    AggregationType::StdDev => format!("STDDEV({col_name}) as {alias}"),
+                    AggregationType::Variance => format!("VARIANCE({col_name}) as {alias}"),
                     _ => continue,
                 };
 
                 select_parts.push(sql_expr);
-                result_mapping.insert(format!("{}_{}", constraint.name, agg_to_sql(agg)), alias);
+                let agg_sql = agg_to_sql(agg);
+                result_mapping.insert(format!("{}_{agg_sql}", constraint.name), alias);
             }
         }
 
-        let combined_sql = format!("SELECT {} FROM {}", select_parts.join(", "), table);
+        let select_clause = select_parts.join(", ");
+        let combined_sql = format!("SELECT {select_clause} FROM {table}");
 
         Ok(ConstraintGroup {
             constraints,

@@ -102,7 +102,8 @@ pub fn truncate_field(value: &str, max_length: usize) -> String {
     if value.len() <= max_length {
         value.to_string()
     } else {
-        format!("{}...(truncated)", &value[..max_length])
+        let truncated = &value[..max_length];
+        format!("{truncated}...(truncated)")
     }
 }
 

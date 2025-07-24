@@ -4,6 +4,7 @@ description = "Example binaries for the Term data validation library."
 edition = "2021"
 name = "term-examples"
 version = "0.1.0"
+license = "MIT"
 
 [dependencies]
 arrow = "55"

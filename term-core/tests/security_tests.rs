@@ -27,8 +27,7 @@ async fn test_sql_injection_in_column_names() {
         let uniqueness_result = UniquenessConstraint::full_uniqueness(column, 1.0);
         assert!(
             uniqueness_result.is_err(),
-            "UniquenessConstraint should reject column: {}",
-            column
+            "UniquenessConstraint should reject column: {column}"
         );
 
         // Pattern constraint
@@ -76,8 +75,7 @@ async fn test_custom_sql_expression_validation() {
         let result = CustomSqlConstraint::new(expr, None::<String>);
         assert!(
             result.is_err(),
-            "CustomSqlConstraint should reject expression: {}",
-            expr
+            "CustomSqlConstraint should reject expression: {expr}"
         );
 
         // We just need to ensure the expression is rejected, regardless of error type
@@ -100,8 +98,7 @@ async fn test_safe_sql_expressions() {
         let result = CustomSqlConstraint::new(expr, None::<String>);
         assert!(
             result.is_ok(),
-            "CustomSqlConstraint should accept safe expression: {}",
-            expr
+            "CustomSqlConstraint should accept safe expression: {expr}"
         );
     }
 }
@@ -194,7 +191,7 @@ mod credential_tests {
     #[test]
     fn test_secure_string_no_debug_leak() {
         let secure = SecureString::new("secret_password");
-        let debug_output = format!("{:?}", secure);
+        let debug_output = format!("{secure:?}");
 
         // Debug output should not contain the actual password
         assert!(

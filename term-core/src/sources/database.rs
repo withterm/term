@@ -184,7 +184,7 @@ impl DatabaseSource {
                         .await
                         .map_err(|e| TermError::DataSource {
                             source_type: "PostgreSQL".to_string(),
-                            message: format!("Failed to create PostgreSQL connection pool: {}", e),
+                            message: format!("Failed to create PostgreSQL connection pool: {e}"),
                             source: Some(Box::new(e)),
                         })?,
                 );
@@ -197,8 +197,8 @@ impl DatabaseSource {
                     .map_err(|e| TermError::DataSource {
                         source_type: "PostgreSQL".to_string(),
                         message: format!(
-                            "Failed to create table provider for '{}': {}",
-                            self.table_name, e
+                            "Failed to create table provider for '{}': {e}",
+                            self.table_name
                         ),
                         source: None,
                     })
@@ -228,7 +228,7 @@ impl DatabaseSource {
                     Arc::new(MySQLConnectionPool::new(mysql_params).await.map_err(|e| {
                         TermError::DataSource {
                             source_type: "MySQL".to_string(),
-                            message: format!("Failed to create MySQL connection pool: {}", e),
+                            message: format!("Failed to create MySQL connection pool: {e}"),
                             source: Some(Box::new(e)),
                         }
                     })?);
@@ -241,8 +241,8 @@ impl DatabaseSource {
                     .map_err(|e| TermError::DataSource {
                         source_type: "MySQL".to_string(),
                         message: format!(
-                            "Failed to create table provider for '{}': {}",
-                            self.table_name, e
+                            "Failed to create table provider for '{}': {e}",
+                            self.table_name
                         ),
                         source: None,
                     })
@@ -259,7 +259,7 @@ impl DatabaseSource {
                     .await
                     .map_err(|e| TermError::DataSource {
                         source_type: "SQLite".to_string(),
-                        message: format!("Failed to create SQLite connection pool: {}", e),
+                        message: format!("Failed to create SQLite connection pool: {e}"),
                         source: None,
                     })?,
                 );
@@ -272,8 +272,8 @@ impl DatabaseSource {
                     .map_err(|e| TermError::DataSource {
                         source_type: "SQLite".to_string(),
                         message: format!(
-                            "Failed to create table provider for '{}': {}",
-                            self.table_name, e
+                            "Failed to create table provider for '{}': {e}",
+                            self.table_name
                         ),
                         source: None,
                     })
@@ -303,7 +303,7 @@ impl super::DataSource for DatabaseSource {
         ctx.register_table(table_name, provider)
             .map_err(|e| TermError::DataSource {
                 source_type: self.config.database_type().to_string(),
-                message: format!("Failed to register table '{}': {}", table_name, e),
+                message: format!("Failed to register table '{table_name}': {e}"),
                 source: Some(Box::new(e)),
             })?;
 
@@ -342,7 +342,8 @@ impl super::DataSource for DatabaseSource {
             }
             #[cfg(feature = "sqlite")]
             DatabaseConfig::SQLite(path) => {
-                format!("SQLite table '{}' at {}", self.table_name, path)
+                let table_name = &self.table_name;
+                format!("SQLite table '{table_name}' at {path}")
             }
         }
     }

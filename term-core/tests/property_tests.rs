@@ -160,7 +160,7 @@ async fn create_string_test_context(
         if should_be_null {
             values.push(None);
         } else {
-            values.push(Some(format!("{}_{}", pattern, i)));
+            values.push(Some(format!("{pattern}_{i}")));
         }
     }
 
@@ -503,12 +503,12 @@ proptest! {
 
             // Add valid email-like values
             for i in 0..valid_count {
-                values.push(format!("user{}@example.com", i));
+                values.push(format!("user{i}@example.com"));
             }
 
             // Add invalid values
             for i in 0..invalid_count {
-                values.push(format!("invalid_{}", i));
+                values.push(format!("invalid_{i}"));
             }
 
             // Shuffle
@@ -894,7 +894,7 @@ proptest! {
 
             // Add non-numeric strings
             for i in 0..num_strings {
-                values.push(format!("text_{}", i));
+                values.push(format!("text_{i}"));
             }
 
             // Shuffle

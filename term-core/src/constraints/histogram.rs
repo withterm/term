@@ -238,7 +238,7 @@ impl Constraint for HistogramConstraint {
         let df = ctx.sql(&sql).await.map_err(|e| {
             TermError::constraint_evaluation(
                 self.name(),
-                format!("Failed to execute histogram query: {}", e),
+                format!("Failed to execute histogram query: {e}"),
             )
         })?;
 
@@ -365,13 +365,13 @@ impl Constraint for HistogramConstraint {
         };
 
         let message = if status == ConstraintStatus::Failure {
+            let most_common_pct = histogram.most_common_ratio() * 100.0;
+            let null_pct = histogram.null_ratio() * 100.0;
             Some(format!(
-                "Histogram assertion '{}' failed for column '{}'. Distribution: {} distinct values, most common ratio: {:.2}%, null ratio: {:.2}%",
+                "Histogram assertion '{}' failed for column '{}'. Distribution: {} distinct values, most common ratio: {most_common_pct:.2}%, null ratio: {null_pct:.2}%",
                 self.assertion_description,
                 self.column,
-                histogram.distinct_count,
-                histogram.most_common_ratio() * 100.0,
-                histogram.null_ratio() * 100.0
+                histogram.distinct_count
             ))
         } else {
             None

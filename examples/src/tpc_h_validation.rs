@@ -235,11 +235,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .value(0);
 
     println!("\n📊 Referential Integrity Summary:");
-    println!("  Total customers: {}", total_customers);
-    println!(
-        "  Unique customers in orders: {}",
-        unique_customers_in_orders
-    );
+    println!("  Total customers: {total_customers}");
+    println!("  Unique customers in orders: {unique_customers_in_orders}");
     println!("  ✅ All order customers exist in customer table");
 
     // Check lineitem-order integrity
@@ -272,11 +269,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap()
         .value(0);
 
-    println!("\n  Total orders: {}", total_orders);
-    println!(
-        "  Unique orders in lineitems: {}",
-        unique_orders_in_lineitems
-    );
+    println!("\n  Total orders: {total_orders}");
+    println!("  Unique orders in lineitems: {unique_orders_in_lineitems}");
     println!("  ✅ All lineitem orders exist in orders table");
 
     // Clean up
@@ -290,9 +284,9 @@ fn display_results(table_name: &str, result: &term_core::core::ValidationResult)
     let report = result.report();
 
     if result.is_failure() {
-        println!("❌ {} validation FAILED", table_name);
+        println!("❌ {table_name} validation FAILED");
     } else {
-        println!("✅ {} validation PASSED", table_name);
+        println!("✅ {table_name} validation PASSED");
     }
 
     println!("  Total checks: {}", report.metrics.total_checks);
@@ -308,9 +302,9 @@ fn display_results(table_name: &str, result: &term_core::core::ValidationResult)
                 Level::Warning => "🟡",
                 Level::Info => "🔵",
             };
-            println!("  {} {}: {}", icon, issue.constraint_name, issue.message);
+            println!("  {icon} {}: {}", issue.constraint_name, issue.message);
             if let Some(metric) = issue.metric {
-                println!("      Metric: {:.4}", metric);
+                println!("      Metric: {metric:.4}");
             }
         }
     }
@@ -318,7 +312,7 @@ fn display_results(table_name: &str, result: &term_core::core::ValidationResult)
     if !report.metrics.custom_metrics.is_empty() {
         println!("\n  Metrics:");
         for (name, value) in &report.metrics.custom_metrics {
-            println!("    {}: {:.4}", name, value);
+            println!("    {name}: {value:.4}");
         }
     }
 }

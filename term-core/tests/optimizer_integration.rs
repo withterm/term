@@ -71,8 +71,7 @@ mod tests {
         // The optimized version should theoretically be faster
         // (though in practice with small data, overhead might make it slower)
         println!(
-            "Optimized duration: {:?}, Non-optimized duration: {:?}",
-            optimized_duration, non_optimized_duration
+            "Optimized duration: {optimized_duration:?}, Non-optimized duration: {non_optimized_duration:?}"
         );
     }
 

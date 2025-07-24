@@ -38,7 +38,7 @@ async fn create_test_data(rows: usize) -> SessionContext {
 
         // 95% valid emails, 3% invalid, 2% null
         let email = if rng.gen_range(0..100) < 95 {
-            Some(format!("user{}@example.com", i))
+            Some(format!("user{i}@example.com"))
         } else if rng.gen_range(0..100) < 98 {
             Some("invalid-email".to_string())
         } else {

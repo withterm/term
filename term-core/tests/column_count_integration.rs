@@ -169,7 +169,7 @@ async fn test_column_count_edge_cases() {
 
     // Test with many columns (50+)
     let many_fields: Vec<Field> = (0..50)
-        .map(|i| Field::new(format!("col_{}", i), DataType::Int64, true))
+        .map(|i| Field::new(format!("col_{i}"), DataType::Int64, true))
         .collect();
 
     let schema = Arc::new(Schema::new(many_fields));

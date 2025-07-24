@@ -172,7 +172,10 @@ impl CsvSource {
             let dir_path = first_path_obj
                 .parent()
                 .ok_or_else(|| TermError::Configuration("Invalid file path".to_string()))?;
-            let table_path = ListingTableUrl::parse(dir_path.to_str().unwrap())?;
+            let dir_path_str = dir_path.to_str().ok_or_else(|| {
+                TermError::Configuration("Path contains invalid UTF-8".to_string())
+            })?;
+            let table_path = ListingTableUrl::parse(dir_path_str)?;
 
             let extension = if first_path.ends_with(".tsv") {
                 ".tsv"
@@ -197,13 +200,11 @@ impl CsvSource {
             let table = ListingTable::try_new(config)?;
 
             // Register temporarily to infer schema
-            let temp_table_name = format!(
-                "_temp_schema_inference_{}",
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_nanos()
-            );
+            let timestamp = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_err(|e| TermError::Internal(format!("Failed to get system time: {e}")))?
+                .as_nanos();
+            let temp_table_name = format!("_temp_schema_inference_{timestamp}");
             ctx.register_table(&temp_table_name, Arc::new(table))?;
 
             let df = ctx.table(&temp_table_name).await?;
@@ -301,7 +302,7 @@ impl DataSource for CsvSource {
                     std::path::Path::new(path)
                         .extension()
                         .and_then(|ext| ext.to_str())
-                        .map(|ext| format!(".{}", ext))
+                        .map(|ext| format!(".{ext}"))
                         .unwrap_or_else(|| ".csv".to_string())
                 };
 
@@ -330,7 +331,10 @@ impl DataSource for CsvSource {
             let dir_path = first_path
                 .parent()
                 .ok_or_else(|| TermError::Configuration("Invalid file path".to_string()))?;
-            let table_path = ListingTableUrl::parse(dir_path.to_str().unwrap())?;
+            let dir_path_str = dir_path.to_str().ok_or_else(|| {
+                TermError::Configuration("Path contains invalid UTF-8".to_string())
+            })?;
+            let table_path = ListingTableUrl::parse(dir_path_str)?;
 
             // Determine the file extension from the actual files
             let extension = if self.paths[0].ends_with(".tsv") {
@@ -380,9 +384,11 @@ impl DataSource for CsvSource {
 
     fn description(&self) -> String {
         if self.paths.len() == 1 {
-            format!("CSV file: {}", self.paths[0])
+            let path = &self.paths[0];
+            format!("CSV file: {path}")
         } else {
-            format!("CSV files: {} files", self.paths.len())
+            let count = self.paths.len();
+            format!("CSV files: {count} files")
         }
     }
 }

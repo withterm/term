@@ -1,5 +1,6 @@
 //! Check type and builder for grouping constraints.
 #![allow(deprecated)] // Allow deprecated constraints for backward compatibility
+#![allow(clippy::expect_used)] // Allow expect() in builder methods as they would require API changes
 //!
 //! This module provides the [`Check`] type and [`CheckBuilder`] for creating validation checks.
 //! Starting with v0.2.0, we provide a new unified API through the `builder_extensions` module
@@ -492,13 +493,13 @@ impl CheckBuilder {
     /// use term_core::core::{Check, Level};
     /// use term_core::constraints::LengthAssertion;
     ///
-    /// // Old API:
+    /// // Using the convenience method:
     /// let check = Check::builder("password_validation")
     ///     .level(Level::Error)
     ///     .has_min_length("password", 8)
     ///     .build();
     ///
-    /// // New unified API (recommended):
+    /// // Or using the unified length API:
     /// let check = Check::builder("password_validation")
     ///     .level(Level::Error)
     ///     .length("password", LengthAssertion::Min(8))

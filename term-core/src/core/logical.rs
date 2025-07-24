@@ -93,9 +93,9 @@ impl LogicalOperator {
         match self {
             LogicalOperator::All => "all".to_string(),
             LogicalOperator::Any => "any".to_string(),
-            LogicalOperator::Exactly(n) => format!("exactly {}", n),
-            LogicalOperator::AtLeast(n) => format!("at least {}", n),
-            LogicalOperator::AtMost(n) => format!("at most {}", n),
+            LogicalOperator::Exactly(n) => format!("exactly {n}"),
+            LogicalOperator::AtLeast(n) => format!("at least {n}"),
+            LogicalOperator::AtMost(n) => format!("at most {n}"),
         }
     }
 }
@@ -193,7 +193,15 @@ impl From<&str> for ColumnSpec {
 impl From<Vec<String>> for ColumnSpec {
     fn from(v: Vec<String>) -> Self {
         match v.len() {
-            1 => ColumnSpec::Single(v.into_iter().next().unwrap()),
+            1 => {
+                // Safe to use expect here because we've checked the length is 1
+                #[allow(clippy::expect_used)]
+                ColumnSpec::Single(
+                    v.into_iter()
+                        .next()
+                        .expect("Vector with length 1 should have one element"),
+                )
+            }
             _ => ColumnSpec::Multiple(v),
         }
     }

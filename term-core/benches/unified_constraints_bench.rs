@@ -11,7 +11,7 @@ use datafusion::datasource::MemTable;
 use datafusion::prelude::*;
 use rand::prelude::*;
 use std::sync::Arc;
-use term_core::constraints::{Assertion, CompletenessConstraint, FormatType, FormatOptions};
+use term_core::constraints::{Assertion, CompletenessConstraint, FormatOptions, FormatType};
 use term_core::core::builder_extensions::{CompletenessOptions, StatisticalOptions};
 use term_core::core::{Check, Level, ValidationSuite};
 
@@ -41,7 +41,7 @@ async fn create_test_data(rows: usize) -> SessionContext {
 
         // 95% valid emails, 3% invalid, 2% null
         let email = if rng.gen_range(0..100) < 95 {
-            Some(format!("user{}@example.com", i))
+            Some(format!("user{i}@example.com"))
         } else if rng.gen_range(0..100) < 98 {
             Some("invalid-email".to_string())
         } else {

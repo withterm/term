@@ -127,7 +127,8 @@ impl FormatterConfig {
 ///
 /// impl ResultFormatter for MyCustomFormatter {
 ///     fn format(&self, result: &ValidationResult) -> term_core::prelude::Result<String> {
-///         Ok(format!("Custom format: {}", result.is_success()))
+///         let success = result.is_success();
+///         Ok(format!("Custom format: {success}"))
 ///     }
 /// }
 /// ```
@@ -233,11 +234,11 @@ impl ResultFormatter for JsonFormatter {
 
         if self.pretty {
             serde_json::to_string_pretty(&filtered_result).map_err(|e| {
-                TermError::Internal(format!("Failed to serialize result to JSON: {}", e))
+                TermError::Internal(format!("Failed to serialize result to JSON: {e}"))
             })
         } else {
             serde_json::to_string(&filtered_result).map_err(|e| {
-                TermError::Internal(format!("Failed to serialize result to JSON: {}", e))
+                TermError::Internal(format!("Failed to serialize result to JSON: {e}"))
             })
         }
     }
@@ -371,7 +372,7 @@ impl ResultFormatter for HumanFormatter {
             writeln!(output).unwrap();
             writeln!(output, "📈 Custom Metrics:").unwrap();
             for (name, value) in &report.metrics.custom_metrics {
-                writeln!(output, "   {}: {:.3}", name, value).unwrap();
+                writeln!(output, "   {name}: {value:.3}").unwrap();
             }
         }
 
@@ -415,8 +416,7 @@ impl ResultFormatter for HumanFormatter {
 
                 writeln!(
                     output,
-                    "   {} Issue #{}: {}",
-                    level_symbol,
+                    "   {level_symbol} Issue #{}: {}",
                     i + 1,
                     issue.constraint_name
                 )
@@ -426,7 +426,7 @@ impl ResultFormatter for HumanFormatter {
                 writeln!(output, "      Message: {}", issue.message).unwrap();
 
                 if let Some(metric) = issue.metric {
-                    writeln!(output, "      Metric: {:.3}", metric).unwrap();
+                    writeln!(output, "      Metric: {metric:.3}").unwrap();
                 }
             }
 
@@ -517,9 +517,9 @@ impl ResultFormatter for MarkdownFormatter {
 
         // Main heading
         if result.is_success() {
-            writeln!(output, "{} ✅ Validation Report - PASSED", h).unwrap();
+            writeln!(output, "{h} ✅ Validation Report - PASSED").unwrap();
         } else {
-            writeln!(output, "{} ❌ Validation Report - FAILED", h).unwrap();
+            writeln!(output, "{h} ❌ Validation Report - FAILED").unwrap();
         }
 
         writeln!(output).unwrap();
@@ -532,7 +532,7 @@ impl ResultFormatter for MarkdownFormatter {
         // Summary table
         if config.include_metrics {
             writeln!(output).unwrap();
-            writeln!(output, "{}# Summary", h).unwrap();
+            writeln!(output, "{h}# Summary").unwrap();
             writeln!(output).unwrap();
             writeln!(output, "| Metric | Value |").unwrap();
             writeln!(output, "|--------|-------|").unwrap();
@@ -557,19 +557,19 @@ impl ResultFormatter for MarkdownFormatter {
         // Custom metrics
         if config.include_custom_metrics && !report.metrics.custom_metrics.is_empty() {
             writeln!(output).unwrap();
-            writeln!(output, "{}# Custom Metrics", h).unwrap();
+            writeln!(output, "{h}# Custom Metrics").unwrap();
             writeln!(output).unwrap();
             writeln!(output, "| Metric | Value |").unwrap();
             writeln!(output, "|--------|-------|").unwrap();
             for (name, value) in &report.metrics.custom_metrics {
-                writeln!(output, "| {} | {:.3} |", name, value).unwrap();
+                writeln!(output, "| {name} | {value:.3} |").unwrap();
             }
         }
 
         // Issues
         if config.include_issues && !report.issues.is_empty() {
             writeln!(output).unwrap();
-            writeln!(output, "{}# Issues", h).unwrap();
+            writeln!(output, "{h}# Issues").unwrap();
             writeln!(output).unwrap();
 
             let issues_to_show = if config.max_issues < 0 {
@@ -588,9 +588,7 @@ impl ResultFormatter for MarkdownFormatter {
 
                 writeln!(
                     output,
-                    "{}## {} Issue #{}: {}",
-                    h,
-                    level_emoji,
+                    "{h}## {level_emoji} Issue #{}: {}",
                     i + 1,
                     issue.constraint_name
                 )
@@ -601,7 +599,7 @@ impl ResultFormatter for MarkdownFormatter {
                 writeln!(output, "- **Message:** {}", issue.message).unwrap();
 
                 if let Some(metric) = issue.metric {
-                    writeln!(output, "- **Metric:** {:.3}", metric).unwrap();
+                    writeln!(output, "- **Metric:** {metric:.3}").unwrap();
                 }
 
                 writeln!(output).unwrap();

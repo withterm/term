@@ -9,13 +9,20 @@ on:
     # Run security audit daily at 2 AM UTC
     - cron: '0 2 * * *'
 
+permissions:
+  # Allow access to commit list
+  contents: read
+  # Allow access to adding comments
+  discussions: write
+  pull-requests: write
+
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   security-audit:
     name: Security Audit
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
       
@@ -52,21 +59,32 @@ jobs:
 
   dependency-review:
     name: Dependency Review
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     if: github.event_name == 'pull_request'
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
       
-      - name: Dependency Review
-        uses: actions/dependency-review-action@v3
-        with:
-          fail-on-severity: moderate
-          deny-licenses: GPL-3.0, AGPL-3.0
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Install cargo-deny
+        run: cargo install cargo-deny
+      
+      - name: Check licenses
+        run: |
+          echo "Checking for denied licenses (GPL-3.0, AGPL-3.0 are implicitly denied)..."
+          cargo deny check licenses
+      
+      - name: Check banned dependencies
+        run: cargo deny check bans
+      
+      - name: Check security advisories
+        run: cargo deny check advisories
 
   static-analysis:
     name: Static Security Analysis
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
       
@@ -77,17 +95,25 @@ jobs:
       
       - name: Run Clippy with security lints
         run: |
-          cargo clippy --all-targets --all-features -- \
+          # Run clippy on library code (excluding tests)
+          cargo clippy --lib --bins --features all-cloud,telemetry,test-utils -- \
             -D warnings \
             -W clippy::unwrap_used \
             -W clippy::expect_used \
             -W clippy::panic \
             -W clippy::unimplemented \
             -W clippy::todo
+          
+          # Run clippy on tests with relaxed rules (allow unwrap in tests)
+          cargo clippy --tests --benches --examples --all-features -- \
+            -D warnings \
+            -A clippy::unwrap_used \
+            -A clippy::expect_used \
+            -A clippy::panic
 
   secret-scanning:
     name: Secret Scanning
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
       
@@ -95,3 +121,4 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}

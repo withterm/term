@@ -49,7 +49,7 @@ impl Constraint for ColumnCountConstraint {
         let df = ctx.table("data").await.map_err(|e| {
             TermError::constraint_evaluation(
                 self.name(),
-                format!("Failed to access table 'data': {}", e),
+                format!("Failed to access table 'data': {e}"),
             )
         })?;
 
@@ -67,8 +67,7 @@ impl Constraint for ColumnCountConstraint {
 
         let message = if status == ConstraintStatus::Failure {
             Some(format!(
-                "Column count {} does not satisfy assertion {}",
-                column_count,
+                "Column count {column_count} does not satisfy assertion {}",
                 self.assertion.description()
             ))
         } else {
@@ -116,7 +115,7 @@ mod tests {
 
         // Create a schema with the specified number of columns
         let fields: Vec<Field> = (0..num_columns)
-            .map(|i| Field::new(format!("col_{}", i), DataType::Int64, true))
+            .map(|i| Field::new(format!("col_{i}"), DataType::Int64, true))
             .collect();
 
         let schema = Arc::new(Schema::new(fields));

@@ -132,7 +132,8 @@ impl ValidationSuite {
                             ConstraintStatus::Failure => {
                                 metrics.failed_checks += 1;
                                 let failure_message = result.message.clone().unwrap_or_else(|| {
-                                    format!("Constraint {} failed", constraint.name())
+                                    let name = constraint.name();
+                                    format!("Constraint {name} failed")
                                 });
                                 let issue = ValidationIssue {
                                     check_name: check.name().to_string(),
@@ -192,7 +193,9 @@ impl ValidationSuite {
 
                         // Record custom metrics
                         if let Some(metric_value) = result.metric {
-                            let metric_name = format!("{}.{}", check.name(), constraint.name());
+                            let check_name = check.name();
+                            let constraint_name = constraint.name();
+                            let metric_name = format!("{check_name}.{constraint_name}");
                             metrics
                                 .custom_metrics
                                 .insert(metric_name.clone(), metric_value);
@@ -226,7 +229,7 @@ impl ValidationSuite {
                             check_name: check.name().to_string(),
                             constraint_name: constraint.name().to_string(),
                             level: check.level(),
-                            message: format!("Error evaluating constraint: {}", e),
+                            message: format!("Error evaluating constraint: {e}"),
                             metric: None,
                         };
 

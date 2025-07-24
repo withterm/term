@@ -95,7 +95,9 @@ impl QueryOptimizer {
 
         for check in checks {
             for constraint in check.constraints() {
-                let name = format!("{}.{}", check.name(), constraint.name());
+                let check_name = check.name();
+                let constraint_name = constraint.name();
+                let name = format!("{check_name}.{constraint_name}");
                 constraints.push((name, constraint.clone()));
             }
         }
@@ -115,7 +117,9 @@ impl QueryOptimizer {
             let mut results = Vec::new();
 
             for constraint in check.constraints() {
-                let name = format!("{}.{}", check.name(), constraint.name());
+                let check_name = check.name();
+                let constraint_name = constraint.name();
+                let name = format!("{check_name}.{constraint_name}");
                 if let Some(result) = constraint_results.get(&name) {
                     results.push(result.clone());
                 }
@@ -153,7 +157,7 @@ impl QueryOptimizer {
 
         let combinable = analysis.iter().filter(|a| a.is_combinable).count();
 
-        explanation.push_str(&format!("Combinable Constraints: {}\n", combinable));
+        explanation.push_str(&format!("Combinable Constraints: {combinable}\n"));
         explanation.push_str(&format!(
             "Optimization Ratio: {:.1}%\n\n",
             if constraints.is_empty() {

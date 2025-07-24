@@ -241,10 +241,13 @@ async fn register_customer(ctx: &SessionContext, scale: ScaleFactor) -> Result<(
 
     let c_custkey: Vec<i64> = (1..=row_count).map(|i| i as i64).collect();
     let c_name: Vec<String> = (1..=row_count)
-        .map(|i| format!("Customer#{:09}", i))
+        .map(|i| format!("Customer#{i:09}"))
         .collect();
     let c_address: Vec<String> = (1..=row_count)
-        .map(|i| format!("Address {}", i % 100))
+        .map(|i| {
+            let addr_num = i % 100;
+            format!("Address {addr_num}")
+        })
         .collect();
     let c_nationkey: Vec<i64> = (1..=row_count).map(|i| (i % 25) as i64).collect();
     let c_phone: Vec<String> = (1..=row_count)
@@ -267,7 +270,7 @@ async fn register_customer(ctx: &SessionContext, scale: ScaleFactor) -> Result<(
             if i % 10 == 0 {
                 None
             } else {
-                Some(format!("Customer comment {}", i))
+                Some(format!("Customer comment {i}"))
             }
         })
         .collect();
@@ -319,11 +322,19 @@ async fn register_orders(ctx: &SessionContext, scale: ScaleFactor) -> Result<()>
         .map(|i| 1000.0 + ((i * 137) % 50000) as f64)
         .collect();
     let o_orderdate: Vec<String> = (1..=row_count)
-        .map(|i| format!("199{}-{:02}-{:02}", 2 + (i % 7), 1 + (i % 12), 1 + (i % 28)))
+        .map(|i| {
+            let year = 2 + (i % 7);
+            let month = 1 + (i % 12);
+            let day = 1 + (i % 28);
+            format!("199{year}-{month:02}-{day:02}")
+        })
         .collect();
     let o_orderpriority: Vec<&str> = (1..=row_count).map(|i| priorities[i % 5]).collect();
     let o_clerk: Vec<String> = (1..=row_count)
-        .map(|i| format!("Clerk#{:09}", (i * 7) % 1000 + 1))
+        .map(|i| {
+            let clerk_id = (i * 7) % 1000 + 1;
+            format!("Clerk#{clerk_id:09}")
+        })
         .collect();
     let o_shippriority: Vec<i64> = (1..=row_count).map(|_| 0).collect();
     let o_comment: Vec<Option<String>> = (1..=row_count)
@@ -331,7 +342,7 @@ async fn register_orders(ctx: &SessionContext, scale: ScaleFactor) -> Result<()>
             if i % 8 == 0 {
                 None
             } else {
-                Some(format!("Order comment {}", i))
+                Some(format!("Order comment {i}"))
             }
         })
         .collect();
@@ -452,7 +463,7 @@ async fn register_lineitem(ctx: &SessionContext, scale: ScaleFactor) -> Result<(
             l_comment.push(if item_count % 10 == 0 {
                 None
             } else {
-                Some(format!("Line comment {}", item_count))
+                Some(format!("Line comment {item_count}"))
             });
 
             item_count += 1;
@@ -505,10 +516,13 @@ async fn register_supplier(ctx: &SessionContext, scale: ScaleFactor) -> Result<(
 
     let s_suppkey: Vec<i64> = (1..=row_count).map(|i| i as i64).collect();
     let s_name: Vec<String> = (1..=row_count)
-        .map(|i| format!("Supplier#{:09}", i))
+        .map(|i| format!("Supplier#{i:09}"))
         .collect();
     let s_address: Vec<String> = (1..=row_count)
-        .map(|i| format!("Supplier Address {}", i % 50))
+        .map(|i| {
+            let addr_num = i % 50;
+            format!("Supplier Address {addr_num}")
+        })
         .collect();
     let s_nationkey: Vec<i64> = (1..=row_count).map(|i| (i % 25) as i64).collect();
     let s_phone: Vec<String> = (1..=row_count)
@@ -530,7 +544,7 @@ async fn register_supplier(ctx: &SessionContext, scale: ScaleFactor) -> Result<(
             if i % 7 == 0 {
                 None
             } else {
-                Some(format!("Supplier comment {}", i))
+                Some(format!("Supplier comment {i}"))
             }
         })
         .collect();
@@ -572,17 +586,25 @@ async fn register_part(ctx: &SessionContext, scale: ScaleFactor) -> Result<()> {
     let row_count = scale.row_counts().part.min(1000); // Limit for testing
 
     let p_partkey: Vec<i64> = (1..=row_count).map(|i| i as i64).collect();
-    let p_name: Vec<String> = (1..=row_count)
-        .map(|i| format!("Part Name {}", i))
-        .collect();
+    let p_name: Vec<String> = (1..=row_count).map(|i| format!("Part Name {i}")).collect();
     let p_mfgr: Vec<String> = (1..=row_count)
-        .map(|i| format!("Manufacturer#{}", 1 + (i % 5)))
+        .map(|i| {
+            let mfg_num = 1 + (i % 5);
+            format!("Manufacturer#{mfg_num}")
+        })
         .collect();
     let p_brand: Vec<String> = (1..=row_count)
-        .map(|i| format!("Brand#{}{}", 1 + (i % 5), 1 + ((i * 3) % 5)))
+        .map(|i| {
+            let brand1 = 1 + (i % 5);
+            let brand2 = 1 + ((i * 3) % 5);
+            format!("Brand#{brand1}{brand2}")
+        })
         .collect();
     let p_type: Vec<String> = (1..=row_count)
-        .map(|i| format!("{} BRASS", types[i % types.len()]))
+        .map(|i| {
+            let part_type = types[i % types.len()];
+            format!("{part_type} BRASS")
+        })
         .collect();
     let p_size: Vec<i64> = (1..=row_count).map(|i| (1 + (i % 50)) as i64).collect();
     let p_container: Vec<&str> = (1..=row_count)
@@ -596,7 +618,7 @@ async fn register_part(ctx: &SessionContext, scale: ScaleFactor) -> Result<()> {
             if i % 6 == 0 {
                 None
             } else {
-                Some(format!("Part comment {}", i))
+                Some(format!("Part comment {i}"))
             }
         })
         .collect();
@@ -657,7 +679,7 @@ async fn register_partsupp(ctx: &SessionContext, scale: ScaleFactor) -> Result<(
             ps_comment.push(if item_count % 5 == 0 {
                 None
             } else {
-                Some(format!("PartSupp comment {}", item_count))
+                Some(format!("PartSupp comment {item_count}"))
             });
 
             item_count += 1;
@@ -773,11 +795,11 @@ mod tests {
         ];
         for table in &tables {
             let df = ctx
-                .sql(&format!("SELECT COUNT(*) FROM {}", table))
+                .sql(&format!("SELECT COUNT(*) FROM {table}"))
                 .await
                 .unwrap();
             let batches = df.collect().await.unwrap();
-            assert!(!batches.is_empty(), "Table {} should have data", table);
+            assert!(!batches.is_empty(), "Table {table} should have data");
         }
     }
 

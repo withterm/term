@@ -35,16 +35,13 @@ impl LengthAssertion {
     /// Returns the SQL condition for this length assertion.
     fn sql_condition(&self, column: &str) -> String {
         match self {
-            LengthAssertion::Min(min) => format!("LENGTH({}) >= {}", column, min),
-            LengthAssertion::Max(max) => format!("LENGTH({}) <= {}", column, max),
+            LengthAssertion::Min(min) => format!("LENGTH({column}) >= {min}"),
+            LengthAssertion::Max(max) => format!("LENGTH({column}) <= {max}"),
             LengthAssertion::Between(min, max) => {
-                format!(
-                    "LENGTH({}) >= {} AND LENGTH({}) <= {}",
-                    column, min, column, max
-                )
+                format!("LENGTH({column}) >= {min} AND LENGTH({column}) <= {max}")
             }
-            LengthAssertion::Exactly(len) => format!("LENGTH({}) = {}", column, len),
-            LengthAssertion::NotEmpty => format!("LENGTH({}) >= 1", column),
+            LengthAssertion::Exactly(len) => format!("LENGTH({column}) = {len}"),
+            LengthAssertion::NotEmpty => format!("LENGTH({column}) >= 1"),
         }
     }
 
@@ -62,10 +59,10 @@ impl LengthAssertion {
     /// Returns a human-readable description for this assertion.
     fn description(&self) -> String {
         match self {
-            LengthAssertion::Min(min) => format!("at least {} characters", min),
-            LengthAssertion::Max(max) => format!("at most {} characters", max),
-            LengthAssertion::Between(min, max) => format!("between {} and {} characters", min, max),
-            LengthAssertion::Exactly(len) => format!("exactly {} characters", len),
+            LengthAssertion::Min(min) => format!("at least {min} characters"),
+            LengthAssertion::Max(max) => format!("at most {max} characters"),
+            LengthAssertion::Between(min, max) => format!("between {min} and {max} characters"),
+            LengthAssertion::Exactly(len) => format!("exactly {len} characters"),
             LengthAssertion::NotEmpty => "not empty".to_string(),
         }
     }
@@ -164,9 +161,8 @@ impl Constraint for LengthConstraint {
 
         let sql = format!(
             "SELECT 
-                COUNT(CASE WHEN {} OR {} IS NULL THEN 1 END) * 1.0 / NULLIF(COUNT(*), 0) as ratio
-            FROM data",
-            condition, column_identifier
+                COUNT(CASE WHEN {condition} OR {column_identifier} IS NULL THEN 1 END) * 1.0 / NULLIF(COUNT(*), 0) as ratio
+            FROM data"
         );
 
         let df = ctx.sql(&sql).await?;

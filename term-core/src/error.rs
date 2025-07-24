@@ -186,8 +186,8 @@ where
         self.map_err(|e| {
             let base_error = e.into();
             match base_error {
-                TermError::Internal(inner) => TermError::Internal(format!("{}: {}", msg, inner)),
-                other => TermError::Internal(format!("{}: {}", msg, other)),
+                TermError::Internal(inner) => TermError::Internal(format!("{msg}: {inner}")),
+                other => TermError::Internal(format!("{msg}: {other}")),
             }
         })
     }
@@ -200,8 +200,8 @@ where
             let msg = f();
             let base_error = e.into();
             match base_error {
-                TermError::Internal(inner) => TermError::Internal(format!("{}: {}", msg, inner)),
-                other => TermError::Internal(format!("{}: {}", msg, other)),
+                TermError::Internal(inner) => TermError::Internal(format!("{msg}: {inner}")),
+                other => TermError::Internal(format!("{msg}: {other}")),
             }
         })
     }

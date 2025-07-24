@@ -232,8 +232,7 @@ async fn test_string_length_failures() {
             .count();
         assert!(
             length_issues >= 2,
-            "Expected issues mentioning 'length' but found {}",
-            length_issues
+            "Expected issues mentioning 'length' but found {length_issues}"
         );
     } else {
         panic!("Expected validation to fail");

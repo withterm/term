@@ -108,10 +108,8 @@ impl UniquenessType {
     pub fn description(&self) -> String {
         match self {
             UniquenessType::FullUniqueness { threshold } => {
-                format!(
-                    "validates that at least {:.1}% of values are unique",
-                    threshold * 100.0
-                )
+                let threshold_pct = threshold * 100.0;
+                format!("validates that at least {threshold_pct:.1}% of values are unique")
             }
             UniquenessType::Distinctness(assertion) => {
                 format!(
@@ -132,10 +130,9 @@ impl UniquenessType {
                 threshold,
                 null_handling,
             } => {
+                let threshold_pct = threshold * 100.0;
                 format!(
-                    "validates that at least {:.1}% of values are unique (nulls: {})",
-                    threshold * 100.0,
-                    null_handling
+                    "validates that at least {threshold_pct:.1}% of values are unique (nulls: {null_handling})"
                 )
             }
             UniquenessType::UniqueComposite {
@@ -143,11 +140,9 @@ impl UniquenessType {
                 null_handling,
                 case_sensitive,
             } => {
+                let threshold_pct = threshold * 100.0;
                 format!(
-                    "validates composite uniqueness at {:.1}% threshold (nulls: {}, case-sensitive: {})",
-                    threshold * 100.0,
-                    null_handling,
-                    case_sensitive
+                    "validates composite uniqueness at {threshold_pct:.1}% threshold (nulls: {null_handling}, case-sensitive: {case_sensitive})"
                 )
             }
         }
@@ -557,7 +552,8 @@ impl UniquenessConstraint {
         let columns_expr = if self.columns.len() == 1 {
             escaped_columns[0].clone()
         } else {
-            format!("({})", escaped_columns.join(", "))
+            let cols = escaped_columns.join(", ");
+            format!("({cols})")
         };
 
         let sql = match &self.uniqueness_type {
@@ -571,17 +567,15 @@ impl UniquenessConstraint {
                     format!(
                         "SELECT 
                             COUNT(*) as total_count,
-                            COUNT(DISTINCT COALESCE({}, '<NULL>')) as unique_count
-                         FROM data",
-                        col
+                            COUNT(DISTINCT COALESCE({col}, '<NULL>')) as unique_count
+                         FROM data"
                     )
                 } else {
                     format!(
                         "SELECT 
                             COUNT(*) as total_count,
-                            COUNT(DISTINCT {}) as unique_count
-                         FROM data",
-                        columns_expr
+                            COUNT(DISTINCT {columns_expr}) as unique_count
+                         FROM data"
                     )
                 }
             }
@@ -595,18 +589,16 @@ impl UniquenessConstraint {
                     format!(
                         "SELECT 
                             COUNT(*) as total_count,
-                            COUNT(DISTINCT {}) + CASE WHEN COUNT(*) - COUNT({}) > 0 THEN COUNT(*) - COUNT({}) ELSE 0 END as unique_count
-                         FROM data",
-                        col, col, col
+                            COUNT(DISTINCT {col}) + CASE WHEN COUNT(*) - COUNT({col}) > 0 THEN COUNT(*) - COUNT({col}) ELSE 0 END as unique_count
+                         FROM data"
                     )
                 } else {
                     // For multi-column, this is more complex - treat as regular for now
                     format!(
                         "SELECT 
                             COUNT(*) as total_count,
-                            COUNT(DISTINCT {}) as unique_count
-                         FROM data",
-                        columns_expr
+                            COUNT(DISTINCT {columns_expr}) as unique_count
+                         FROM data"
                     )
                 }
             }
@@ -615,9 +607,8 @@ impl UniquenessConstraint {
                 format!(
                     "SELECT 
                         COUNT(*) as total_count,
-                        COUNT(DISTINCT {}) as unique_count
-                     FROM data",
-                    columns_expr
+                        COUNT(DISTINCT {columns_expr}) as unique_count
+                     FROM data"
                 )
             }
         };
@@ -638,25 +629,23 @@ impl UniquenessConstraint {
             let col = &escaped_columns[0];
             format!(
                 "SELECT 
-                    COUNT(DISTINCT {}) as distinct_count,
+                    COUNT(DISTINCT {col}) as distinct_count,
                     COUNT(*) as total_count
-                 FROM data",
-                col
+                 FROM data"
             )
         } else {
             // Multi-column distinctness using concatenation with NULL handling
             let concat_expr = escaped_columns
                 .iter()
-                .map(|col| format!("COALESCE(CAST({} AS VARCHAR), '<NULL>')", col))
+                .map(|col| format!("COALESCE(CAST({col} AS VARCHAR), '<NULL>')"))
                 .collect::<Vec<_>>()
                 .join(" || '|' || ");
 
             format!(
                 "SELECT 
-                    COUNT(DISTINCT ({})) as distinct_count,
+                    COUNT(DISTINCT ({concat_expr})) as distinct_count,
                     COUNT(*) as total_count
-                 FROM data",
-                concat_expr
+                 FROM data"
             )
         };
 
@@ -676,15 +665,14 @@ impl UniquenessConstraint {
 
         let sql = format!(
             "WITH value_counts AS (
-                SELECT {}, COUNT(*) as cnt
+                SELECT {columns_list}, COUNT(*) as cnt
                 FROM data
-                GROUP BY {}
+                GROUP BY {columns_list}
             )
             SELECT 
                 COALESCE(SUM(CASE WHEN cnt = 1 THEN cnt ELSE 0 END), 0) as unique_count,
                 COALESCE(SUM(cnt), 0) as total_count
-            FROM value_counts",
-            columns_list, columns_list
+            FROM value_counts"
         );
 
         Ok(sql)
@@ -702,23 +690,23 @@ impl UniquenessConstraint {
         let columns_expr = if self.columns.len() == 1 {
             escaped_columns[0].clone()
         } else {
-            format!("({})", escaped_columns.join(", "))
+            let cols = escaped_columns.join(", ");
+            format!("({cols})")
         };
 
         // Check for NULLs in all columns
         let null_check = escaped_columns
             .iter()
-            .map(|col| format!("{} IS NOT NULL", col))
+            .map(|col| format!("{col} IS NOT NULL"))
             .collect::<Vec<_>>()
             .join(" AND ");
 
         let sql = format!(
             "SELECT 
                 COUNT(*) as total_count,
-                COUNT(DISTINCT {}) as unique_count,
-                COUNT(*) - COUNT(CASE WHEN {} THEN 1 END) as null_count
-             FROM data",
-            columns_expr, null_check
+                COUNT(DISTINCT {columns_expr}) as unique_count,
+                COUNT(*) - COUNT(CASE WHEN {null_check} THEN 1 END) as null_count
+             FROM data"
         );
 
         Ok(sql)
@@ -756,9 +744,7 @@ impl UniquenessConstraint {
             Ok(ConstraintResult::failure_with_metric(
                 uniqueness_ratio,
                 format!(
-                    "Uniqueness ratio {:.3} is below threshold {:.3} for columns: {}",
-                    uniqueness_ratio,
-                    threshold,
+                    "Uniqueness ratio {uniqueness_ratio:.3} is below threshold {threshold:.3} for columns: {}",
                     self.columns.join(", ")
                 ),
             ))
@@ -797,9 +783,8 @@ impl UniquenessConstraint {
             Ok(ConstraintResult::failure_with_metric(
                 ratio,
                 format!(
-                    "{} ratio {:.3} does not satisfy {} for columns: {}",
+                    "{} ratio {ratio:.3} does not satisfy {} for columns: {}",
                     self.uniqueness_type.name(),
-                    ratio,
                     assertion.description(),
                     self.columns.join(", ")
                 ),
@@ -842,8 +827,7 @@ impl UniquenessConstraint {
             Ok(ConstraintResult::failure_with_metric(
                 null_count / total_count,
                 format!(
-                    "Primary key columns contain {} NULL values: {}",
-                    null_count,
+                    "Primary key columns contain {null_count} NULL values: {}",
                     self.columns.join(", ")
                 ),
             ))

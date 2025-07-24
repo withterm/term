@@ -309,7 +309,7 @@ async fn test_exact_quantile_performance_comparison() {
     let duration = start.elapsed();
 
     assert!(results.is_success());
-    println!("Exact quantile calculation took: {:?}", duration);
+    println!("Exact quantile calculation took: {duration:?}");
 
     // Should complete in reasonable time even for exact calculation
     assert!(duration.as_secs() < 5, "Exact quantile took too long");

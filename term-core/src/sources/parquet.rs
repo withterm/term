@@ -178,7 +178,10 @@ impl DataSource for ParquetSource {
             let dir_path = first_path
                 .parent()
                 .ok_or_else(|| TermError::Configuration("Invalid file path".to_string()))?;
-            let table_path = ListingTableUrl::parse(dir_path.to_str().unwrap())?;
+            let dir_path_str = dir_path.to_str().ok_or_else(|| {
+                TermError::Configuration("Path contains invalid UTF-8".to_string())
+            })?;
+            let table_path = ListingTableUrl::parse(dir_path_str)?;
 
             let format = ParquetFormat::new().with_enable_pruning(self.options.enable_pruning);
 
@@ -214,9 +217,11 @@ impl DataSource for ParquetSource {
 
     fn description(&self) -> String {
         if self.paths.len() == 1 {
-            format!("Parquet file: {}", self.paths[0])
+            let path = &self.paths[0];
+            format!("Parquet file: {path}")
         } else {
-            format!("Parquet files: {} files", self.paths.len())
+            let count = self.paths.len();
+            format!("Parquet files: {count} files")
         }
     }
 }

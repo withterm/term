@@ -263,7 +263,7 @@ impl CorrelationConstraint {
         let escaped_col2 = SqlSecurity::escape_identifier(col2)?;
 
         // Using DataFusion's CORR function
-        Ok(format!("CORR({}, {})", escaped_col1, escaped_col2))
+        Ok(format!("CORR({escaped_col1}, {escaped_col2})"))
     }
 
     /// Generates SQL for covariance.
@@ -272,7 +272,7 @@ impl CorrelationConstraint {
         let escaped_col2 = SqlSecurity::escape_identifier(col2)?;
 
         // Using DataFusion's COVAR_SAMP function
-        Ok(format!("COVAR_SAMP({}, {})", escaped_col1, escaped_col2))
+        Ok(format!("COVAR_SAMP({escaped_col1}, {escaped_col2})"))
     }
 
     /// Generates SQL for Spearman correlation (rank-based).
@@ -285,10 +285,9 @@ impl CorrelationConstraint {
         // Using window functions to compute ranks
         Ok(format!(
             "CORR(
-                RANK() OVER (ORDER BY {}) AS rank1,
-                RANK() OVER (ORDER BY {}) AS rank2
-            )",
-            escaped_col1, escaped_col2
+                RANK() OVER (ORDER BY {escaped_col1}) AS rank1,
+                RANK() OVER (ORDER BY {escaped_col2}) AS rank2
+            )"
         ))
     }
 }
@@ -333,7 +332,7 @@ impl Constraint for CorrelationConstraint {
                         let expr = sql_expression
                             .replace("{column1}", &escaped_col1)
                             .replace("{column2}", &escaped_col2);
-                        format!("SELECT {} as corr_value FROM data", expr)
+                        format!("SELECT {expr} as corr_value FROM data")
                     }
                     _ => {
                         // Other correlation types would require more complex implementation
@@ -354,7 +353,9 @@ impl Constraint for CorrelationConstraint {
                     .column(0)
                     .as_any()
                     .downcast_ref::<arrow::array::Float64Array>()
-                    .unwrap()
+                    .ok_or_else(|| {
+                        TermError::Internal("Failed to downcast to Float64Array".to_string())
+                    })?
                     .value(0);
 
                 if assertion.evaluate(value) {
@@ -363,12 +364,8 @@ impl Constraint for CorrelationConstraint {
                     Ok(ConstraintResult::failure_with_metric(
                         value,
                         format!(
-                            "{} between {} and {} is {} which does not {}",
-                            correlation_type.name(),
-                            column1,
-                            column2,
-                            value,
-                            assertion
+                            "{} between {column1} and {column2} is {value} which does not {assertion}",
+                            correlation_type.name()
                         ),
                     ))
                 }
@@ -415,7 +412,9 @@ impl Constraint for CorrelationConstraint {
                     .column(0)
                     .as_any()
                     .downcast_ref::<arrow::array::Float64Array>()
-                    .unwrap()
+                    .ok_or_else(|| {
+                        TermError::Internal("Failed to downcast to Float64Array".to_string())
+                    })?
                     .value(0);
 
                 if abs_corr <= *max_correlation {
@@ -424,8 +423,7 @@ impl Constraint for CorrelationConstraint {
                     Ok(ConstraintResult::failure_with_metric(
                         abs_corr,
                         format!(
-                            "Columns {} and {} have correlation {} exceeding independence threshold {}",
-                            column1, column2, abs_corr, max_correlation
+                            "Columns {column1} and {column2} have correlation {abs_corr} exceeding independence threshold {max_correlation}"
                         ),
                     ))
                 }
@@ -456,22 +454,18 @@ impl Constraint for CorrelationConstraint {
                 correlation_type,
                 ..
             } => format!(
-                "Validates {} between '{}' and '{}'",
-                correlation_type.name(),
-                column1,
-                column2
+                "Validates {} between '{column1}' and '{column2}'",
+                correlation_type.name()
             ),
             CorrelationValidation::Range {
                 column1, column2, ..
             } => format!(
-                "Validates correlation range between '{}' and '{}'",
-                column1, column2
+                "Validates correlation range between '{column1}' and '{column2}'"
             ),
             CorrelationValidation::Independence {
                 column1, column2, ..
             } => format!(
-                "Validates independence between '{}' and '{}'",
-                column1, column2
+                "Validates independence between '{column1}' and '{column2}'"
             ),
             CorrelationValidation::MultiColumn(config) => format!(
                 "Validates correlations among columns: {}",
@@ -483,8 +477,7 @@ impl Constraint for CorrelationConstraint {
                 segment_column,
                 ..
             } => format!(
-                "Validates correlation stability between '{}' and '{}' across '{}'",
-                column1, column2, segment_column
+                "Validates correlation stability between '{column1}' and '{column2}' across '{segment_column}'"
             ),
         };
 

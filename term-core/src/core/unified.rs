@@ -248,9 +248,8 @@ impl UnifiedCompletenessBase {
         let sql = format!(
             "SELECT 
                 COUNT(*) as total_count,
-                COUNT({}) as non_null_count
-             FROM data",
-            column
+                COUNT({column}) as non_null_count
+             FROM data"
         );
 
         let df = ctx.sql(&sql).await?;

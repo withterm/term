@@ -64,14 +64,14 @@ impl Assertion {
     /// Returns a human-readable description of the assertion.
     pub fn description(&self) -> String {
         match self {
-            Assertion::Equals(v) => format!("equals {}", v),
-            Assertion::NotEquals(v) => format!("not equals {}", v),
-            Assertion::GreaterThan(v) => format!("greater than {}", v),
-            Assertion::GreaterThanOrEqual(v) => format!("greater than or equal to {}", v),
-            Assertion::LessThan(v) => format!("less than {}", v),
-            Assertion::LessThanOrEqual(v) => format!("less than or equal to {}", v),
-            Assertion::Between(min, max) => format!("between {} and {}", min, max),
-            Assertion::NotBetween(min, max) => format!("not between {} and {}", min, max),
+            Assertion::Equals(v) => format!("equals {v}"),
+            Assertion::NotEquals(v) => format!("not equals {v}"),
+            Assertion::GreaterThan(v) => format!("greater than {v}"),
+            Assertion::GreaterThanOrEqual(v) => format!("greater than or equal to {v}"),
+            Assertion::LessThan(v) => format!("less than {v}"),
+            Assertion::LessThanOrEqual(v) => format!("less than or equal to {v}"),
+            Assertion::Between(min, max) => format!("between {min} and {max}"),
+            Assertion::NotBetween(min, max) => format!("not between {min} and {max}"),
         }
     }
 }

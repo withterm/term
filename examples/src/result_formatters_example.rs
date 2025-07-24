@@ -114,7 +114,7 @@ async fn main() -> std::result::Result<(), Box<dyn Error>> {
     let minimal_config = FormatterConfig::minimal();
     let minimal_formatter = JsonFormatter::with_config(minimal_config);
     let minimal_json = minimal_formatter.format(&result)?;
-    println!("{}", minimal_json);
+    println!("{minimal_json}");
 
     // Example 3: Human Formatter with different configurations
     println!("\n📋 3. HUMAN FORMATTER OPTIONS");
@@ -194,7 +194,7 @@ async fn main() -> std::result::Result<(), Box<dyn Error>> {
     ];
 
     for (name, config) in configs {
-        println!("\n🔹 {} configuration:", name);
+        println!("\n🔹 {name} configuration:");
         println!("   Metrics: {}", config.include_metrics);
         println!("   Issues: {}", config.include_issues);
         println!("   Colors: {}", config.use_colors);

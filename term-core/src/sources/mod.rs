@@ -168,7 +168,7 @@ pub(crate) async fn expand_globs(patterns: &[String]) -> Result<Vec<String>> {
     let mut paths = Vec::new();
     for pattern in patterns {
         let matches = glob(pattern).map_err(|e| {
-            TermError::Configuration(format!("Invalid glob pattern '{}': {}", pattern, e))
+            TermError::Configuration(format!("Invalid glob pattern '{pattern}': {e}"))
         })?;
 
         for entry in matches {

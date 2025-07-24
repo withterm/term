@@ -112,7 +112,7 @@ impl S3Source {
 
         let object_store = Arc::new(builder.build().map_err(|e| TermError::DataSource {
             source_type: "S3".to_string(),
-            message: format!("Failed to create S3 client: {}", e),
+            message: format!("Failed to create S3 client: {e}"),
             source: Some(Box::new(e)),
         })?);
 
@@ -182,7 +182,7 @@ impl DataSource for S3Source {
         let s3_url = format!("s3://{}/{}", self.config.bucket, self.config.key);
         let url = Url::parse(&s3_url).map_err(|e| TermError::DataSource {
             source_type: "S3".to_string(),
-            message: format!("Invalid S3 URL: {}", e),
+            message: format!("Invalid S3 URL: {e}"),
             source: Some(Box::new(e)),
         })?;
 
@@ -203,9 +203,10 @@ impl DataSource for S3Source {
             ctx.register_json(table_name, &s3_url, Default::default())
                 .await?;
         } else {
+            let key = &self.config.key;
             return Err(TermError::DataSource {
                 source_type: "S3".to_string(),
-                message: format!("Unsupported file format for key: {}", self.config.key),
+                message: format!("Unsupported file format for key: {key}"),
                 source: None,
             });
         }
@@ -294,7 +295,7 @@ impl GcsSource {
 
         let object_store = Arc::new(builder.build().map_err(|e| TermError::DataSource {
             source_type: "GCS".to_string(),
-            message: format!("Failed to create GCS client: {}", e),
+            message: format!("Failed to create GCS client: {e}"),
             source: Some(Box::new(e)),
         })?);
 
@@ -354,7 +355,7 @@ impl DataSource for GcsSource {
         let gcs_url = format!("gs://{}/{}", self.config.bucket, self.config.object);
         let url = Url::parse(&gcs_url).map_err(|e| TermError::DataSource {
             source_type: "GCS".to_string(),
-            message: format!("Invalid GCS URL: {}", e),
+            message: format!("Invalid GCS URL: {e}"),
             source: Some(Box::new(e)),
         })?;
 
@@ -375,9 +376,10 @@ impl DataSource for GcsSource {
             ctx.register_json(table_name, &gcs_url, Default::default())
                 .await?;
         } else {
+            let object = &self.config.object;
             return Err(TermError::DataSource {
                 source_type: "GCS".to_string(),
-                message: format!("Unsupported file format for object: {}", self.config.object),
+                message: format!("Unsupported file format for object: {object}"),
                 source: None,
             });
         }
@@ -492,7 +494,7 @@ impl AzureBlobSource {
 
         let object_store = Arc::new(builder.build().map_err(|e| TermError::DataSource {
             source_type: "Azure".to_string(),
-            message: format!("Failed to create Azure client: {}", e),
+            message: format!("Failed to create Azure client: {e}"),
             source: Some(Box::new(e)),
         })?);
 
@@ -557,10 +559,11 @@ impl DataSource for AzureBlobSource {
             self.config.account, self.config.container, self.config.blob
         );
 
-        let base_url = format!("az://{}", self.config.container);
+        let container = &self.config.container;
+        let base_url = format!("az://{container}");
         let url = Url::parse(&base_url).map_err(|e| TermError::DataSource {
             source_type: "Azure".to_string(),
-            message: format!("Invalid Azure URL: {}", e),
+            message: format!("Invalid Azure URL: {e}"),
             source: Some(Box::new(e)),
         })?;
 
@@ -581,9 +584,10 @@ impl DataSource for AzureBlobSource {
             ctx.register_json(table_name, &azure_url, Default::default())
                 .await?;
         } else {
+            let blob = &self.config.blob;
             return Err(TermError::DataSource {
                 source_type: "Azure".to_string(),
-                message: format!("Unsupported file format for blob: {}", self.config.blob),
+                message: format!("Unsupported file format for blob: {blob}"),
                 source: None,
             });
         }

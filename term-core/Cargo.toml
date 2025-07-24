@@ -37,10 +37,10 @@ telemetry = ["dep:tracing-opentelemetry", "dep:opentelemetry", "dep:opentelemetr
 test-utils = ["dep:rand"]
 
 [dependencies]
-arrow = "55.0"
+arrow = "55.2"
 async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
-datafusion = "48.0"
+datafusion = "48.0.1"
 # datafusion-table-providers = { git = "https://github.com/datafusion-contrib/datafusion-table-providers.git", branch = "main", optional = true }
 # TODO: Replace with crates.io version when available
 glob = "0.3"
@@ -62,7 +62,7 @@ zeroize = { version = "1.8", features = ["derive"] }
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
-parquet = "55.0"
+parquet = "55.2"
 proptest = "1.6"
 rand = "0.8"
 serde_json = "1"

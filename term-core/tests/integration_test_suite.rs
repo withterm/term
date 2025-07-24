@@ -61,7 +61,7 @@ mod constraint_tests {
 
         // Debug output
         if !result.is_success() {
-            println!("Test failed - result: {:#?}", result);
+            println!("Test failed - result: {result:#?}");
             for issue in &result.report().issues {
                 println!("Issue: {} - {}", issue.check_name, issue.message);
             }
@@ -265,7 +265,7 @@ mod constraint_tests {
 
         // Debug output
         if !result.is_success() {
-            println!("Multiple completeness test failed - result: {:#?}", result);
+            println!("Multiple completeness test failed - result: {result:#?}");
             for issue in &result.report().issues {
                 println!("Issue: {} - {}", issue.check_name, issue.message);
             }
@@ -299,7 +299,7 @@ mod constraint_tests {
 
         // Debug output for consistency test
         if !result.is_success() {
-            println!("Consistency test failed - result: {:#?}", result);
+            println!("Consistency test failed - result: {result:#?}");
             for issue in &result.report().issues {
                 println!("Issue: {} - {}", issue.check_name, issue.message);
             }
@@ -373,7 +373,7 @@ mod constraint_tests {
 
         // Debug output for primary key test
         if !result.is_success() {
-            println!("Primary key test failed - result: {:#?}", result);
+            println!("Primary key test failed - result: {result:#?}");
             for issue in &result.report().issues {
                 println!("Issue: {} - {}", issue.check_name, issue.message);
             }
@@ -588,7 +588,7 @@ mod performance_tests {
         let ctx = create_test_context_sf1().await.unwrap();
         let load_time = start.elapsed();
 
-        println!("TPC-H SF1 load time: {:?}", load_time);
+        println!("TPC-H SF1 load time: {load_time:?}");
         assert!(load_time.as_secs() < 10, "Data loading too slow");
 
         let suite = ValidationSuite::builder("performance_test")
@@ -622,11 +622,11 @@ mod performance_tests {
         let result = suite.run(&ctx).await.unwrap();
         let validation_time = start.elapsed();
 
-        println!("Validation time for 4 constraints: {:?}", validation_time);
+        println!("Validation time for 4 constraints: {validation_time:?}");
 
         // Debug output for performance test
         if !result.is_success() {
-            println!("Performance test failed - result: {:#?}", result);
+            println!("Performance test failed - result: {result:#?}");
             for issue in &result.report().issues {
                 println!("Issue: {} - {}", issue.check_name, issue.message);
             }
@@ -647,7 +647,7 @@ mod performance_tests {
             builder = builder.check(
                 Check::builder("check")
                     .level(Level::Warning)
-                    .description(format!("Check {}", table))
+                    .description(format!("Check {table}"))
                     .constraint(SizeConstraint::new(Assertion::GreaterThan(0.0)))
                     .build(),
             );
@@ -659,7 +659,7 @@ mod performance_tests {
         let result = suite.run(&ctx).await.unwrap();
         let elapsed = start.elapsed();
 
-        println!("Time for 5 table checks: {:?}", elapsed);
+        println!("Time for 5 table checks: {elapsed:?}");
         assert!(elapsed.as_secs() < 2, "Multiple checks too slow");
         assert!(result.is_success());
         // assert_eq!(result.check_results().len(), 5); // API changed
@@ -689,7 +689,7 @@ mod performance_tests {
         let result = suite.run(&ctx).await.unwrap();
         let elapsed = start.elapsed();
 
-        println!("Complex aggregation time: {:?}", elapsed);
+        println!("Complex aggregation time: {elapsed:?}");
         assert!(elapsed.as_secs() < 3, "Complex query too slow");
         assert!(result.is_success());
     }
@@ -706,11 +706,11 @@ mod concurrency_tests {
         // Create multiple validation suites
         let suites: Vec<ValidationSuite> = (0..5)
             .map(|i| {
-                ValidationSuite::builder(format!("concurrent_suite_{}", i))
+                ValidationSuite::builder(format!("concurrent_suite_{i}"))
                     .check(
                         Check::builder("check")
                             .level(Level::Warning)
-                            .description(format!("Concurrent check {}", i))
+                            .description(format!("Concurrent check {i}"))
                             .constraint(SizeConstraint::new(Assertion::GreaterThan(0.0)))
                             .constraint(CompletenessConstraint::with_threshold("o_orderkey", 0.95))
                             .build(),
@@ -737,7 +737,7 @@ mod concurrency_tests {
         }
 
         let elapsed = start.elapsed();
-        println!("Concurrent validation time: {:?}", elapsed);
+        println!("Concurrent validation time: {elapsed:?}");
 
         assert!(all_success);
         assert!(elapsed.as_secs() < 5, "Concurrent execution too slow");
@@ -837,7 +837,7 @@ mod concurrency_tests {
         let result = suite.run(&ctx).await.unwrap();
         let elapsed = start.elapsed();
 
-        println!("Time for 8 parallel constraints: {:?}", elapsed);
+        println!("Time for 8 parallel constraints: {elapsed:?}");
         assert!(result.is_success());
         // assert_eq!(result.check_results()[0].constraint_results.len(), 8); // API changed
     }
@@ -857,7 +857,7 @@ mod memory_tests {
         for i in 0..5 {
             let ctx = create_test_context().await.unwrap();
 
-            let suite = ValidationSuite::builder(format!("memory_test_{}", i))
+            let suite = ValidationSuite::builder(format!("memory_test_{i}"))
                 .check(
                     Check::builder("check")
                         .level(Level::Warning)
@@ -1197,7 +1197,7 @@ mod result_tests {
 
         // Debug output for mixed check levels test
         if !result.is_success() {
-            println!("Mixed check levels test failed - result: {:#?}", result);
+            println!("Mixed check levels test failed - result: {result:#?}");
             for issue in &result.report().issues {
                 println!("Issue: {} - {}", issue.check_name, issue.message);
             }
@@ -1267,13 +1267,10 @@ mod result_tests {
 
         // Debug output for JSON serialization test
         if !result.is_success() {
-            println!("JSON test result failed: {:#?}", result);
+            println!("JSON test result failed: {result:#?}");
         }
         if !json.contains("\"overall_status\": \"Success\"") {
-            println!(
-                "JSON doesn't contain Success status. JSON content: {}",
-                json
-            );
+            println!("JSON doesn't contain Success status. JSON content: {json}");
         }
 
         assert!(json.contains("\"suite_name\": \"json_test\""));

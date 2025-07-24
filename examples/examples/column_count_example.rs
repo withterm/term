@@ -34,7 +34,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 async fn register_wide_table(ctx: &SessionContext) -> Result<(), Box<dyn std::error::Error>> {
     // Create a table with 20 columns
     let fields: Vec<Field> = (0..20)
-        .map(|i| Field::new(format!("metric_{}", i), DataType::Int64, true))
+        .map(|i| Field::new(format!("metric_{i}"), DataType::Int64, true))
         .collect();
 
     let schema = Arc::new(Schema::new(fields));
@@ -96,7 +96,7 @@ async fn demonstrate_schema_evolution() -> Result<(), Box<dyn std::error::Error>
     ];
 
     for (version, columns) in versions {
-        println!("  Schema {}: {} columns", version, columns.len());
+        println!("  Schema {version}: {} columns", columns.len());
 
         let ctx = SessionContext::new();
 
@@ -111,7 +111,7 @@ async fn demonstrate_schema_evolution() -> Result<(), Box<dyn std::error::Error>
         ctx.register_batch("data", batch)?;
 
         // Validate against expected schema size
-        let suite = ValidationSuite::builder(format!("schema_{}", version))
+        let suite = ValidationSuite::builder(format!("schema_{version}"))
             .check(
                 Check::builder("schema_requirements")
                     .level(Level::Error)
@@ -146,10 +146,7 @@ async fn demonstrate_dynamic_validation() -> Result<(), Box<dyn std::error::Erro
     ];
 
     for (data_type, min_cols, max_cols) in data_types {
-        println!(
-            "  Validating {} data ({}-{} columns expected)",
-            data_type, min_cols, max_cols
-        );
+        println!("  Validating {data_type} data ({min_cols}-{max_cols} columns expected)");
 
         let ctx = SessionContext::new();
 
@@ -162,7 +159,7 @@ async fn demonstrate_dynamic_validation() -> Result<(), Box<dyn std::error::Erro
         };
 
         let fields: Vec<Field> = (0..actual_cols)
-            .map(|i| Field::new(format!("col_{}", i), DataType::Utf8, true))
+            .map(|i| Field::new(format!("col_{i}"), DataType::Utf8, true))
             .collect();
 
         let schema = Arc::new(Schema::new(fields));
@@ -170,7 +167,7 @@ async fn demonstrate_dynamic_validation() -> Result<(), Box<dyn std::error::Erro
         ctx.register_batch("data", batch)?;
 
         // Dynamic validation based on data type
-        let suite = ValidationSuite::builder(format!("{}_validation", data_type))
+        let suite = ValidationSuite::builder(format!("{data_type}_validation"))
             .check(
                 Check::builder("column_range")
                     .level(Level::Error)
@@ -182,9 +179,9 @@ async fn demonstrate_dynamic_validation() -> Result<(), Box<dyn std::error::Erro
         let results = suite.run(&ctx).await?;
         match results {
             term_core::core::ValidationResult::Success { report, .. } => {
-                println!("    ✅ Validation passed - {} columns found", actual_cols);
+                println!("    ✅ Validation passed - {actual_cols} columns found");
                 if let Some(metric) = report.metrics.custom_metrics.get("column_count") {
-                    println!("    Metric: {:?}", metric);
+                    println!("    Metric: {metric:?}");
                 }
             }
             term_core::core::ValidationResult::Failure { report } => {

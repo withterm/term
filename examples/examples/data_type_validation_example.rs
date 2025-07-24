@@ -173,18 +173,17 @@ async fn analyze_column_types(
     ctx: &SessionContext,
     column: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    println!("\nAnalyzing column '{}' type distribution:", column);
+    println!("\nAnalyzing column '{column}' type distribution:");
 
     // Count different data type patterns
     let sql = format!(
         "SELECT 
-            COUNT(CASE WHEN {} ~ '^-?\\d+$' THEN 1 END) as integer_count,
-            COUNT(CASE WHEN {} ~ '^-?\\d*\\.?\\d+([eE][+-]?\\d+)?$' THEN 1 END) as float_count,
-            COUNT(CASE WHEN {} ~ '^(true|false|TRUE|FALSE|True|False|0|1)$' THEN 1 END) as boolean_count,
-            COUNT(CASE WHEN {} ~ '^\\d{{4}}-\\d{{2}}-\\d{{2}}$' THEN 1 END) as date_count,
+            COUNT(CASE WHEN {column} ~ '^-?\\d+$' THEN 1 END) as integer_count,
+            COUNT(CASE WHEN {column} ~ '^-?\\d*\\.?\\d+([eE][+-]?\\d+)?$' THEN 1 END) as float_count,
+            COUNT(CASE WHEN {column} ~ '^(true|false|TRUE|FALSE|True|False|0|1)$' THEN 1 END) as boolean_count,
+            COUNT(CASE WHEN {column} ~ '^\\d{{4}}-\\d{{2}}-\\d{{2}}$' THEN 1 END) as date_count,
             COUNT(*) as total
-         FROM data",
-        column, column, column, column
+         FROM data"
     );
 
     let df = ctx.sql(&sql).await?;
@@ -223,26 +222,22 @@ async fn analyze_column_types(
             .value(0);
 
         println!(
-            "  - Integer pattern: {} ({:.1}%)",
-            integer_count,
+            "  - Integer pattern: {integer_count} ({:.1}%)",
             (integer_count as f64 / total as f64) * 100.0
         );
         println!(
-            "  - Float pattern: {} ({:.1}%)",
-            float_count,
+            "  - Float pattern: {float_count} ({:.1}%)",
             (float_count as f64 / total as f64) * 100.0
         );
         println!(
-            "  - Boolean pattern: {} ({:.1}%)",
-            boolean_count,
+            "  - Boolean pattern: {boolean_count} ({:.1}%)",
             (boolean_count as f64 / total as f64) * 100.0
         );
         println!(
-            "  - Date pattern: {} ({:.1}%)",
-            date_count,
+            "  - Date pattern: {date_count} ({:.1}%)",
             (date_count as f64 / total as f64) * 100.0
         );
-        println!("  - Total values: {}", total);
+        println!("  - Total values: {total}");
     }
 
     Ok(())

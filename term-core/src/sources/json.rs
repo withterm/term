@@ -290,7 +290,7 @@ impl DataSource for JsonSource {
             // Register each file as a separate table
             let mut table_names = Vec::new();
             for (i, path) in self.paths.iter().enumerate() {
-                let temp_table_name = format!("__{}_temp_{}", table_name, i);
+                let temp_table_name = format!("__{table_name}_temp_{i}");
 
                 if path.ends_with(".json") && self.options.format == JsonFormatType::NdJson {
                     let mut options = NdJsonReadOptions::default();
@@ -331,7 +331,7 @@ impl DataSource for JsonSource {
             if !table_names.is_empty() {
                 let union_sql = table_names
                     .iter()
-                    .map(|name| format!("SELECT * FROM {}", name))
+                    .map(|name| format!("SELECT * FROM {name}"))
                     .collect::<Vec<_>>()
                     .join(" UNION ALL ");
 
@@ -362,9 +362,11 @@ impl DataSource for JsonSource {
         };
 
         if self.paths.len() == 1 {
-            format!("{} file: {}", format_str, self.paths[0])
+            let path = &self.paths[0];
+            format!("{format_str} file: {path}")
         } else {
-            format!("{} files: {} files", format_str, self.paths.len())
+            let count = self.paths.len();
+            format!("{format_str} files: {count} files")
         }
     }
 }

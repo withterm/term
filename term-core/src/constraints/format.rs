@@ -214,11 +214,13 @@ pub enum FormatType {
 impl FormatType {
     /// Returns the regex pattern for this format type.
     fn get_pattern(&self) -> Result<String> {
-        let cache_key = format!("{:?}", self);
+        let cache_key = format!("{self:?}");
 
         // Check cache first
         {
-            let cache = PATTERN_CACHE.read().unwrap();
+            let cache = PATTERN_CACHE.read().map_err(|_| {
+                TermError::Internal("Failed to acquire read lock on pattern cache".to_string())
+            })?;
             if let Some(pattern) = cache.get(&cache_key) {
                 return Ok(pattern.clone());
             }
@@ -287,7 +289,9 @@ impl FormatType {
 
         // Cache the pattern
         {
-            let mut cache = PATTERN_CACHE.write().unwrap();
+            let mut cache = PATTERN_CACHE.write().map_err(|_| {
+                TermError::Internal("Failed to acquire write lock on pattern cache".to_string())
+            })?;
             cache.insert(cache_key, pattern.clone());
         }
 
@@ -314,7 +318,7 @@ impl FormatType {
     /// Returns a human-readable description for this format type.
     pub fn description(&self) -> String {
         match self {
-            FormatType::Regex(pattern) => format!("matches pattern '{}'", pattern),
+            FormatType::Regex(pattern) => format!("matches pattern '{pattern}'"),
             FormatType::Email => "are valid email addresses".to_string(),
             FormatType::Url { allow_localhost } => {
                 if *allow_localhost {
@@ -331,11 +335,11 @@ impl FormatType {
                 }
             }
             FormatType::Phone { country } => match country.as_deref() {
-                Some(c) => format!("are valid {} phone numbers", c),
+                Some(c) => format!("are valid {c} phone numbers"),
                 None => "are valid phone numbers".to_string(),
             },
             FormatType::PostalCode { country } => {
-                format!("are valid {} postal codes", country)
+                format!("are valid {country} postal codes")
             }
             FormatType::UUID => "are valid UUIDs".to_string(),
             FormatType::IPv4 => "are valid IPv4 addresses".to_string(),
@@ -695,7 +699,7 @@ impl Constraint for FormatConstraint {
 
         // Build the SQL based on options
         let column_expr = if self.options.trim_before_check {
-            format!("TRIM({})", column_identifier)
+            format!("TRIM({column_identifier})")
         } else {
             column_identifier.clone()
         };
@@ -709,18 +713,16 @@ impl Constraint for FormatConstraint {
         let sql = if self.options.null_is_valid {
             format!(
                 "SELECT 
-                    COUNT(CASE WHEN {} {} '{}' OR {} IS NULL THEN 1 END) as matches,
+                    COUNT(CASE WHEN {column_expr} {pattern_operator} '{escaped_pattern}' OR {column_identifier} IS NULL THEN 1 END) as matches,
                     COUNT(*) as total
-                 FROM data",
-                column_expr, pattern_operator, escaped_pattern, column_identifier
+                 FROM data"
             )
         } else {
             format!(
                 "SELECT 
-                    COUNT(CASE WHEN {} {} '{}' THEN 1 END) as matches,
+                    COUNT(CASE WHEN {column_expr} {pattern_operator} '{escaped_pattern}' THEN 1 END) as matches,
                     COUNT(*) as total
-                 FROM data",
-                column_expr, pattern_operator, escaped_pattern
+                 FROM data"
             )
         };
 
@@ -771,21 +773,21 @@ impl Constraint for FormatConstraint {
         if is_success {
             Ok(ConstraintResult::success_with_metric(match_ratio))
         } else {
-            let message =
-                match &self.format {
-                    FormatType::CreditCard { detect_only: true } => {
-                        format!(
-                            "Credit card detection ratio {:.3} exceeds threshold {:.3}",
-                            match_ratio, self.threshold
-                        )
-                    }
-                    _ => {
-                        format!(
-                        "Format validation ratio {:.3} is below threshold {:.3} - values that {}",
-                        match_ratio, self.threshold, self.format.description()
+            let message = match &self.format {
+                FormatType::CreditCard { detect_only: true } => {
+                    format!(
+                        "Credit card detection ratio {match_ratio:.3} exceeds threshold {:.3}",
+                        self.threshold
                     )
-                    }
-                };
+                }
+                _ => {
+                    let desc = self.format.description();
+                    format!(
+                        "Format validation ratio {match_ratio:.3} is below threshold {:.3} - values that {desc}",
+                        self.threshold
+                    )
+                }
+            };
 
             Ok(ConstraintResult::failure_with_metric(match_ratio, message))
         }
@@ -802,19 +804,19 @@ impl Constraint for FormatConstraint {
     fn metadata(&self) -> ConstraintMetadata {
         let description = match &self.format {
             FormatType::CreditCard { detect_only: true } => {
+                let threshold_pct = self.threshold * 100.0;
+                let desc = self.format.description();
                 format!(
-                    "Checks that no more than {:.1}% of values in '{}' {}",
-                    self.threshold * 100.0,
-                    self.column,
-                    self.format.description()
+                    "Checks that no more than {threshold_pct:.1}% of values in '{}' {desc}",
+                    self.column
                 )
             }
             _ => {
+                let threshold_pct = self.threshold * 100.0;
+                let desc = self.format.description();
                 format!(
-                    "Checks that at least {:.1}% of values in '{}' {}",
-                    self.threshold * 100.0,
-                    self.column,
-                    self.format.description()
+                    "Checks that at least {threshold_pct:.1}% of values in '{}' {desc}",
+                    self.column
                 )
             }
         };
@@ -1265,8 +1267,7 @@ mod tests {
         for format in formats {
             assert!(
                 format.get_pattern().is_ok(),
-                "Format {:?} should have a valid pattern",
-                format
+                "Format {format:?} should have a valid pattern"
             );
         }
     }

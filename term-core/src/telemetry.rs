@@ -450,9 +450,7 @@ impl TermTelemetry {
     /// * `check_count` - Number of checks in the suite
     #[cfg(feature = "telemetry")]
     pub fn start_suite_span(&self, suite_name: &str, check_count: usize) -> TermSpan {
-        let mut span = self
-            .tracer
-            .start(format!("validation_suite.{}", suite_name));
+        let mut span = self.tracer.start(format!("validation_suite.{suite_name}"));
 
         // Add standard attributes
         span.set_attribute(opentelemetry::KeyValue::new(
@@ -482,9 +480,7 @@ impl TermTelemetry {
     /// Creates a new span for a validation check.
     #[cfg(feature = "telemetry")]
     pub fn start_check_span(&self, check_name: &str, constraint_count: usize) -> TermSpan {
-        let mut span = self
-            .tracer
-            .start(format!("validation_check.{}", check_name));
+        let mut span = self.tracer.start(format!("validation_check.{check_name}"));
 
         span.set_attribute(opentelemetry::KeyValue::new(
             "validation.check.name",
@@ -513,7 +509,7 @@ impl TermTelemetry {
     pub fn start_constraint_span(&self, constraint_name: &str, column: Option<&str>) -> TermSpan {
         let mut span = self
             .tracer
-            .start(format!("validation_constraint.{}", constraint_name));
+            .start(format!("validation_constraint.{constraint_name}"));
 
         span.set_attribute(opentelemetry::KeyValue::new(
             "validation.constraint.name",
@@ -546,7 +542,7 @@ impl TermTelemetry {
     /// Creates a new span for data source operations.
     #[cfg(feature = "telemetry")]
     pub fn start_datasource_span(&self, source_type: &str, table_name: &str) -> TermSpan {
-        let mut span = self.tracer.start(format!("data_source.{}", source_type));
+        let mut span = self.tracer.start(format!("data_source.{source_type}"));
 
         span.set_attribute(opentelemetry::KeyValue::new(
             "data_source.type",

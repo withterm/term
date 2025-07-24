@@ -1,4 +1,4 @@
-//! Comprehensive tests for the new unified builder API.
+//! Comprehensive tests for the unified builder API.
 
 use arrow::array::{Float64Array, Int64Array, StringArray};
 use arrow::datatypes::{DataType, Field, Schema};
@@ -365,9 +365,8 @@ async fn test_convenience_methods() {
 async fn test_backward_compatibility() {
     let ctx = create_user_context().await;
 
-    // Old API should still work (with deprecation warnings)
-    #[allow(deprecated)]
-    let suite = ValidationSuite::builder("old_api")
+    // Test that constraint creation methods still work
+    let suite = ValidationSuite::builder("constraint_api")
         .check(
             Check::builder("old_methods")
                 .constraint(CompletenessConstraint::complete("user_id"))
@@ -396,7 +395,7 @@ async fn test_error_handling() {
         "Valid percentile should not cause an error"
     );
 
-    // Test that the new API handles edge cases gracefully
+    // Test that the API handles edge cases gracefully
     let _ctx = create_user_context().await;
 
     // Test with empty column list (should be caught during construction)

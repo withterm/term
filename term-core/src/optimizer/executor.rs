@@ -44,7 +44,8 @@ impl OptimizedExecutor {
             debug!("Executing combined query: {}", group.combined_sql);
 
             // Check cache for common statistics
-            let cache_key = format!("table:{}", group.constraints[0].table_name);
+            let table_name = &group.constraints[0].table_name;
+            let cache_key = format!("table:{table_name}");
             let cached_stats = cache.get(&cache_key);
 
             // Apply predicate pushdown if enabled
@@ -205,17 +206,13 @@ impl OptimizedExecutor {
             if optimized_sql.to_lowercase().contains(" where ") {
                 // Append predicates to existing WHERE clause
                 let predicates_str = pushdown_predicates.join(" AND ");
-                optimized_sql = optimized_sql.replace(
-                    " FROM data",
-                    &format!(" FROM data WHERE {}", predicates_str),
-                );
+                optimized_sql = optimized_sql
+                    .replace(" FROM data", &format!(" FROM data WHERE {predicates_str}"));
             } else if optimized_sql.to_lowercase().contains(" from ") {
                 // Add WHERE clause after FROM
                 let predicates_str = pushdown_predicates.join(" AND ");
-                optimized_sql = optimized_sql.replace(
-                    " FROM data",
-                    &format!(" FROM data WHERE {}", predicates_str),
-                );
+                optimized_sql = optimized_sql
+                    .replace(" FROM data", &format!(" FROM data WHERE {predicates_str}"));
             }
 
             debug!(
@@ -317,7 +314,7 @@ impl OptimizedExecutor {
                     Err(e) => {
                         // If we can't parse the SQL, just show it without the logical plan
                         explanation
-                            .push_str(&format!("\n  Logical Plan: Unable to generate ({})\n", e));
+                            .push_str(&format!("\n  Logical Plan: Unable to generate ({e})\n"));
                     }
                 }
             }

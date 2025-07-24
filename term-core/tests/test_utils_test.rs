@@ -273,7 +273,7 @@ async fn test_limited_row_counts() {
 
     for (table, expected_max) in table_counts {
         let df = ctx
-            .sql(&format!("SELECT COUNT(*) as cnt FROM {}", table))
+            .sql(&format!("SELECT COUNT(*) as cnt FROM {table}"))
             .await
             .unwrap();
         let batches = df.collect().await.unwrap();
@@ -286,12 +286,9 @@ async fn test_limited_row_counts() {
 
         assert!(
             count <= expected_max,
-            "{} has {} rows, expected <= {}",
-            table,
-            count,
-            expected_max
+            "{table} has {count} rows, expected <= {expected_max}"
         );
-        assert!(count > 0, "{} should have at least 1 row", table);
+        assert!(count > 0, "{table} should have at least 1 row");
     }
 }
 

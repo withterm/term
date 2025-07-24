@@ -27,8 +27,7 @@ async fn create_test_context(rows: usize) -> SessionContext {
 
     // Generate data
     let id_array = Int32Array::from((0..rows as i32).collect::<Vec<_>>());
-    let name_array =
-        StringArray::from((0..rows).map(|i| format!("item_{}", i)).collect::<Vec<_>>());
+    let name_array = StringArray::from((0..rows).map(|i| format!("item_{i}")).collect::<Vec<_>>());
     let value_array = Float64Array::from((0..rows).map(|i| (i as f64) * 10.5).collect::<Vec<_>>());
     let category_array = StringArray::from(
         (0..rows)
@@ -81,7 +80,7 @@ fn benchmark_optimizer_vs_sequential(c: &mut Criterion) {
         let rows = *rows;
 
         // Benchmark with optimizer
-        group.bench_function(format!("optimized_{}_rows", rows), |b| {
+        group.bench_function(format!("optimized_{rows}_rows"), |b| {
             b.iter(|| {
                 rt.block_on(async {
                     let ctx = create_test_context(rows).await;
@@ -154,7 +153,7 @@ fn benchmark_optimizer_vs_sequential(c: &mut Criterion) {
         });
 
         // Benchmark without optimizer
-        group.bench_function(format!("sequential_{}_rows", rows), |b| {
+        group.bench_function(format!("sequential_{rows}_rows"), |b| {
             b.iter(|| {
                 rt.block_on(async {
                     let ctx = create_test_context(rows).await;
@@ -370,7 +369,7 @@ fn benchmark_grouping_efficiency(c: &mut Criterion) {
     for num_constraints in [5, 10, 20, 50].iter() {
         let num = *num_constraints;
 
-        group.bench_function(format!("{}_constraints", num), |b| {
+        group.bench_function(format!("{num}_constraints"), |b| {
             b.iter(|| {
                 rt.block_on(async {
                     let ctx = create_test_context(5000).await;
@@ -380,9 +379,8 @@ fn benchmark_grouping_efficiency(c: &mut Criterion) {
                     // Add many completeness constraints
                     for col in ["id", "name", "value", "category", "quantity"].iter() {
                         for i in 0..num / 5 {
-                            check_builder = check_builder.constraint(
-                                CompletenessConstraint::complete(format!("{}_{}", col, i)),
-                            );
+                            check_builder = check_builder
+                                .constraint(CompletenessConstraint::complete(format!("{col}_{i}")));
                         }
                     }
 

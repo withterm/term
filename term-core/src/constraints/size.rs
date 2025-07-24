@@ -108,7 +108,7 @@ impl Constraint for SizeConstraint {
             );
             Ok(ConstraintResult::failure_with_metric(
                 row_count,
-                format!("Size {} does not {}", row_count, self.assertion),
+                format!("Size {row_count} does not {}", self.assertion),
             ))
         }
     }

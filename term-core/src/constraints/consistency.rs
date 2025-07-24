@@ -142,7 +142,7 @@ impl Constraint for DataTypeConsistencyConstraint {
                 let type_name = types.value(i);
                 let count = counts.value(i);
                 let percentage = (count as f64 / total_count as f64) * 100.0;
-                type_distribution.push(format!("{}: {:.1}%", type_name, percentage));
+                type_distribution.push(format!("{type_name}: {percentage:.1}%"));
             }
         }
 

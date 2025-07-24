@@ -93,7 +93,7 @@ impl DataTypeValidation {
     /// Returns a human-readable description of the validation.
     fn description(&self) -> String {
         match self {
-            DataTypeValidation::SpecificType(dt) => format!("type is {}", dt),
+            DataTypeValidation::SpecificType(dt) => format!("type is {dt}"),
             DataTypeValidation::Consistency { threshold } => {
                 format!("type consistency >= {:.1}%", threshold * 100.0)
             }
@@ -102,7 +102,7 @@ impl DataTypeValidation {
                 NumericValidation::Positive => "positive values".to_string(),
                 NumericValidation::Integer => "integer values".to_string(),
                 NumericValidation::Range { min, max } => {
-                    format!("values between {} and {}", min, max)
+                    format!("values between {min} and {max}")
                 }
                 NumericValidation::Finite => "finite values".to_string(),
             },
@@ -110,18 +110,18 @@ impl DataTypeValidation {
                 StringTypeValidation::NotEmpty => "non-empty strings".to_string(),
                 StringTypeValidation::ValidUtf8 => "valid UTF-8 strings".to_string(),
                 StringTypeValidation::NotBlank => "non-blank strings".to_string(),
-                StringTypeValidation::MaxBytes(n) => format!("strings with max {} bytes", n),
+                StringTypeValidation::MaxBytes(n) => format!("strings with max {n} bytes"),
             },
             DataTypeValidation::Temporal(tv) => match tv {
                 TemporalValidation::PastDate => "past dates".to_string(),
                 TemporalValidation::FutureDate => "future dates".to_string(),
                 TemporalValidation::DateRange { start, end } => {
-                    format!("dates between {} and {}", start, end)
+                    format!("dates between {start} and {end}")
                 }
                 TemporalValidation::ValidTimezone => "valid timezone".to_string(),
             },
             DataTypeValidation::Custom { sql_predicate } => {
-                format!("custom validation: {}", sql_predicate)
+                format!("custom validation: {sql_predicate}")
             }
         }
     }
@@ -138,56 +138,53 @@ impl DataTypeValidation {
             }
             DataTypeValidation::Consistency { threshold } => {
                 // Count the most common type and compare to threshold
-                format!(
-                    "CAST(MAX(type_count) AS FLOAT) / CAST(COUNT(*) AS FLOAT) >= {}",
-                    threshold
-                )
+                format!("CAST(MAX(type_count) AS FLOAT) / CAST(COUNT(*) AS FLOAT) >= {threshold}")
             }
             DataTypeValidation::Numeric(nv) => match nv {
                 NumericValidation::NonNegative => {
-                    format!("{} >= 0", escaped_column)
+                    format!("{escaped_column} >= 0")
                 }
                 NumericValidation::Positive => {
-                    format!("{} > 0", escaped_column)
+                    format!("{escaped_column} > 0")
                 }
                 NumericValidation::Integer => {
-                    format!("{} = CAST({} AS INT)", escaped_column, escaped_column)
+                    format!("{escaped_column} = CAST({escaped_column} AS INT)")
                 }
                 NumericValidation::Range { min, max } => {
-                    format!("{} BETWEEN {} AND {}", escaped_column, min, max)
+                    format!("{escaped_column} BETWEEN {min} AND {max}")
                 }
                 NumericValidation::Finite => {
-                    format!("ISFINITE({})", escaped_column)
+                    format!("ISFINITE({escaped_column})")
                 }
             },
             DataTypeValidation::String(sv) => match sv {
                 StringTypeValidation::NotEmpty => {
-                    format!("LENGTH({}) > 0", escaped_column)
+                    format!("LENGTH({escaped_column}) > 0")
                 }
                 StringTypeValidation::ValidUtf8 => {
                     // DataFusion handles UTF-8 validation internally
-                    format!("{} IS NOT NULL", escaped_column)
+                    format!("{escaped_column} IS NOT NULL")
                 }
                 StringTypeValidation::NotBlank => {
-                    format!("TRIM({}) != ''", escaped_column)
+                    format!("TRIM({escaped_column}) != ''")
                 }
                 StringTypeValidation::MaxBytes(n) => {
-                    format!("OCTET_LENGTH({}) <= {}", escaped_column, n)
+                    format!("OCTET_LENGTH({escaped_column}) <= {n}")
                 }
             },
             DataTypeValidation::Temporal(tv) => match tv {
                 TemporalValidation::PastDate => {
-                    format!("{} < CURRENT_DATE", escaped_column)
+                    format!("{escaped_column} < CURRENT_DATE")
                 }
                 TemporalValidation::FutureDate => {
-                    format!("{} > CURRENT_DATE", escaped_column)
+                    format!("{escaped_column} > CURRENT_DATE")
                 }
                 TemporalValidation::DateRange { start, end } => {
-                    format!("{} BETWEEN '{}' AND '{}'", escaped_column, start, end)
+                    format!("{escaped_column} BETWEEN '{start}' AND '{end}'")
                 }
                 TemporalValidation::ValidTimezone => {
                     // This would need custom implementation
-                    format!("{} IS NOT NULL", escaped_column)
+                    format!("{escaped_column} IS NOT NULL")
                 }
             },
             DataTypeValidation::Custom { sql_predicate } => {
@@ -310,12 +307,12 @@ impl Constraint for DataTypeConstraint {
 
                 let actual_type = field.data_type();
 
-                if format!("{:?}", actual_type) == *expected_type {
+                if format!("{actual_type:?}") == *expected_type {
                     Ok(ConstraintResult {
                         status: ConstraintStatus::Success,
                         message: Some(format!(
-                            "Column '{}' has expected type {}",
-                            self.column, expected_type
+                            "Column '{}' has expected type {expected_type}",
+                            self.column
                         )),
                         metric: Some(1.0),
                     })
@@ -323,8 +320,8 @@ impl Constraint for DataTypeConstraint {
                     Ok(ConstraintResult {
                         status: ConstraintStatus::Failure,
                         message: Some(format!(
-                            "Column '{}' has type {:?}, expected {}",
-                            self.column, actual_type, expected_type
+                            "Column '{}' has type {actual_type:?}, expected {expected_type}",
+                            self.column
                         )),
                         metric: Some(0.0),
                     })
@@ -384,10 +381,9 @@ impl Constraint for DataTypeConstraint {
                 let sql = format!(
                     "SELECT 
                         COUNT(*) as total,
-                        SUM(CASE WHEN {} THEN 1 ELSE 0 END) as valid
+                        SUM(CASE WHEN {predicate} THEN 1 ELSE 0 END) as valid
                      FROM data
                      WHERE {} IS NOT NULL",
-                    predicate,
                     SqlSecurity::escape_identifier(&self.column)?
                 );
 
@@ -406,14 +402,18 @@ impl Constraint for DataTypeConstraint {
                     .column(0)
                     .as_any()
                     .downcast_ref::<arrow::array::Int64Array>()
-                    .unwrap()
+                    .ok_or_else(|| {
+                        TermError::Internal("Failed to extract total count".to_string())
+                    })?
                     .value(0);
 
                 let valid: i64 = batches[0]
                     .column(1)
                     .as_any()
                     .downcast_ref::<arrow::array::Int64Array>()
-                    .unwrap()
+                    .ok_or_else(|| {
+                        TermError::Internal("Failed to extract valid count".to_string())
+                    })?
                     .value(0);
 
                 let validity_rate = valid as f64 / total as f64;

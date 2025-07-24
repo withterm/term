@@ -61,7 +61,7 @@ impl Constraint for ApproxCountDistinctConstraint {
         let df = ctx.sql(&sql).await.map_err(|e| {
             TermError::constraint_evaluation(
                 self.name(),
-                format!("Failed to execute approximate count distinct query: {}", e),
+                format!("Failed to execute approximate count distinct query: {e}"),
             )
         })?;
 
@@ -97,8 +97,7 @@ impl Constraint for ApproxCountDistinctConstraint {
 
         let message = if status == ConstraintStatus::Failure {
             Some(format!(
-                "Approximate distinct count {} does not satisfy assertion {} for column '{}'",
-                approx_count,
+                "Approximate distinct count {approx_count} does not satisfy assertion {} for column '{}'",
                 self.assertion.description(),
                 self.column
             ))

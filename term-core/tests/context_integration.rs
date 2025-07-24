@@ -62,7 +62,7 @@ async fn create_tpc_h_context() -> Result<TermContext> {
             ])),
         ],
     )
-    .map_err(|e| TermError::Internal(format!("Failed to create record batch: {}", e)))?;
+    .map_err(|e| TermError::Internal(format!("Failed to create record batch: {e}")))?;
 
     let orders_table = MemTable::try_new(orders_schema, vec![vec![orders_batch]])?;
     ctx.register_table_provider("orders", Arc::new(orders_table))
@@ -130,7 +130,7 @@ async fn create_tpc_h_context() -> Result<TermContext> {
             ])),
         ],
     )
-    .map_err(|e| TermError::Internal(format!("Failed to create record batch: {}", e)))?;
+    .map_err(|e| TermError::Internal(format!("Failed to create record batch: {e}")))?;
 
     let customer_table = MemTable::try_new(customer_schema, vec![vec![customer_batch]])?;
     ctx.register_table_provider("customer", Arc::new(customer_table))

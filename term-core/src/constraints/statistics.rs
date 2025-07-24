@@ -59,9 +59,18 @@ impl StatisticType {
     /// Returns the SQL expression for this statistic.
     fn sql_expression(&self, column: &str) -> String {
         match self {
-            StatisticType::Median => format!("{}({}, 0.5)", self.sql_function(), column),
-            StatisticType::Percentile(p) => format!("{}({}, {})", self.sql_function(), column, p),
-            _ => format!("{}({})", self.sql_function(), column),
+            StatisticType::Median => {
+                let func = self.sql_function();
+                format!("{func}({column}, 0.5)")
+            }
+            StatisticType::Percentile(p) => {
+                let func = self.sql_function();
+                format!("{func}({column}, {p})")
+            }
+            _ => {
+                let func = self.sql_function();
+                format!("{func}({column})")
+            }
         }
     }
 
@@ -103,7 +112,7 @@ impl StatisticType {
 impl fmt::Display for StatisticType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            StatisticType::Percentile(p) => write!(f, "{}({})", self.name(), p),
+            StatisticType::Percentile(p) => write!(f, "{}({p})", self.name()),
             _ => write!(f, "{}", self.name()),
         }
     }
@@ -246,7 +255,7 @@ impl Constraint for StatisticalConstraint {
     async fn evaluate(&self, ctx: &SessionContext) -> Result<ConstraintResult> {
         let column_identifier = SqlSecurity::escape_identifier(&self.column)?;
         let stat_expr = self.statistic.sql_expression(&column_identifier);
-        let sql = format!("SELECT {} as stat_value FROM data", stat_expr);
+        let sql = format!("SELECT {stat_expr} as stat_value FROM data");
 
         let df = ctx.sql(&sql).await?;
         let batches = df.collect().await?;
@@ -268,9 +277,9 @@ impl Constraint for StatisticalConstraint {
             .ok_or_else(|| TermError::Internal("Failed to extract statistic value".to_string()))
         {
             if array.is_null(0) {
+                let stat_name = self.statistic.name();
                 return Ok(ConstraintResult::failure(format!(
-                    "{} is null (no non-null values)",
-                    self.statistic.name()
+                    "{stat_name} is null (no non-null values)"
                 )));
             }
             array.value(0) as f64
@@ -281,9 +290,9 @@ impl Constraint for StatisticalConstraint {
             .ok_or_else(|| TermError::Internal("Failed to extract statistic value".to_string()))
         {
             if array.is_null(0) {
+                let stat_name = self.statistic.name();
                 return Ok(ConstraintResult::failure(format!(
-                    "{} is null (no non-null values)",
-                    self.statistic.name()
+                    "{stat_name} is null (no non-null values)"
                 )));
             }
             array.value(0)
@@ -299,9 +308,8 @@ impl Constraint for StatisticalConstraint {
             Ok(ConstraintResult::failure_with_metric(
                 value,
                 format!(
-                    "{} {} does not {}",
+                    "{} {value} does not {}",
                     self.statistic.name(),
-                    value,
                     self.assertion
                 ),
             ))
@@ -417,11 +425,13 @@ impl Constraint for MultiStatisticalConstraint {
             .iter()
             .enumerate()
             .map(|(i, (stat, _))| {
-                format!("{} as stat_{}", stat.sql_expression(&column_identifier), i)
+                let expr = stat.sql_expression(&column_identifier);
+                format!("{expr} as stat_{i}")
             })
             .collect();
 
-        let sql = format!("SELECT {} FROM data", sql_parts.join(", "));
+        let parts = sql_parts.join(", ");
+        let sql = format!("SELECT {parts} FROM data");
 
         let df = ctx.sql(&sql).await?;
         let batches = df.collect().await?;
@@ -447,18 +457,21 @@ impl Constraint for MultiStatisticalConstraint {
                 column.as_any().downcast_ref::<arrow::array::Float64Array>()
             {
                 if array.is_null(0) {
-                    failures.push(format!("{} is null", stat_type.name()));
+                    let name = stat_type.name();
+                    failures.push(format!("{name} is null"));
                     continue;
                 }
                 array.value(0)
             } else if let Some(array) = column.as_any().downcast_ref::<arrow::array::Int64Array>() {
                 if array.is_null(0) {
-                    failures.push(format!("{} is null", stat_type.name()));
+                    let name = stat_type.name();
+                    failures.push(format!("{name} is null"));
                     continue;
                 }
                 array.value(0) as f64
             } else {
-                failures.push(format!("Failed to compute {}", stat_type.name()));
+                let name = stat_type.name();
+                failures.push(format!("Failed to compute {name}"));
                 continue;
             };
 
@@ -466,10 +479,8 @@ impl Constraint for MultiStatisticalConstraint {
 
             if !assertion.evaluate(value) {
                 failures.push(format!(
-                    "{} is {} which does not {}",
-                    stat_type.name(),
-                    value,
-                    assertion
+                    "{} is {value} which does not {assertion}",
+                    stat_type.name()
                 ));
             }
         }
@@ -499,11 +510,13 @@ impl Constraint for MultiStatisticalConstraint {
             .collect();
 
         ConstraintMetadata::for_column(&self.column)
-            .with_description(format!(
-                "Checks multiple statistics ({}) for column {}",
-                stat_names.join(", "),
-                self.column
-            ))
+            .with_description({
+                let stats = stat_names.join(", ");
+                format!(
+                    "Checks multiple statistics ({stats}) for column {}",
+                    self.column
+                )
+            })
             .with_custom("statistics_count", self.statistics.len().to_string())
             .with_custom("constraint_type", "multi_statistical")
     }
