@@ -15,7 +15,7 @@ env:
 jobs:
   security-audit:
     name: Security Audit
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
       
@@ -52,7 +52,7 @@ jobs:
 
   dependency-review:
     name: Dependency Review
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     if: github.event_name == 'pull_request'
     steps:
       - name: Checkout Repository
@@ -66,7 +66,7 @@ jobs:
 
   static-analysis:
     name: Static Security Analysis
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
       
@@ -87,7 +87,7 @@ jobs:
 
   secret-scanning:
     name: Secret Scanning
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
       
