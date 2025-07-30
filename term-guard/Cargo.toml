@@ -40,7 +40,7 @@ test-utils = ["dep:rand"]
 arrow = "55.2"
 async-trait = "0.1"
 chrono = {version = "0.4", features = ["serde"]}
-datafusion = "48.0.1"
+datafusion = "49.0.0"
 # datafusion-table-providers = { git = "https://github.com/datafusion-contrib/datafusion-table-providers.git", branch = "main", optional = true }
 # TODO: Replace with crates.io version when available
 glob = "0.3"
