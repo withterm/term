@@ -128,6 +128,7 @@
 //!
 //! Term is built on a modular architecture:
 //!
+//! - **`analyzers`**: Core analyzer framework for computing metrics from data
 //! - **`core`**: Core types like `Check`, `ValidationSuite`, and `ConstraintResult`
 //! - **`constraints`**: All validation constraint implementations
 //! - **`sources`**: Data source connectors and loaders
@@ -161,6 +162,7 @@
 //!     .build();
 //! ```
 
+pub mod analyzers;
 pub mod constraints;
 pub mod core;
 pub mod error;
