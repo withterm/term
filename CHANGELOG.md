@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+#### Constraint Suggestion System
+
+- **SuggestionEngine**: Rule-based system for automatic constraint recommendations
+- **Six Suggestion Rules**:
+  - `CompletenessRule`: Suggests null checks based on data completeness
+  - `UniquenessRule`: Identifies potential primary keys and unique constraints
+  - `PatternRule`: Detects common formats (email, date, phone)
+  - `RangeRule`: Recommends min/max bounds for numeric data
+  - `DataTypeRule`: Ensures data type consistency
+  - `CardinalityRule`: Identifies categorical columns
+- **Confidence Scoring**: Each suggestion includes confidence score and rationale
+- **Priority System**: Critical/High/Medium/Low priority for implementation guidance
+- **Batch Processing**: Analyze multiple columns simultaneously
+
 ## [0.0.1] - 2024-01-24
 
 ### Added

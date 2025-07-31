@@ -89,6 +89,39 @@ let suite = ValidationSuite::builder("Production Pipeline")
 let report = suite.run(&ctx).await?;
 ```
 
+## 🤖 Smart Constraint Suggestions (New!)
+
+**Don't know what to validate? Term can analyze your data and suggest constraints automatically:**
+
+```rust
+use term_guard::analyzers::{ColumnProfiler, SuggestionEngine};
+use term_guard::analyzers::{CompletenessRule, UniquenessRule, PatternRule, RangeRule};
+
+// Profile your data
+let profiler = ColumnProfiler::new();
+let profile = profiler.profile_column(&ctx, "users", "email").await?;
+
+// Get intelligent suggestions
+let engine = SuggestionEngine::new()
+    .add_rule(Box::new(CompletenessRule::new()))    // Suggests null checks
+    .add_rule(Box::new(UniquenessRule::new()))      // Finds potential keys
+    .add_rule(Box::new(PatternRule::new()))         // Detects email/phone patterns
+    .add_rule(Box::new(RangeRule::new()))           // Recommends numeric bounds
+    .confidence_threshold(0.8);
+
+let suggestions = engine.suggest_constraints(&profile);
+
+// Example output:
+// ✓ Suggested: is_complete (confidence: 0.90)
+//   Rationale: Column is 99.8% complete, suggesting completeness constraint
+// ✓ Suggested: is_unique (confidence: 0.95)
+//   Rationale: Column has 99.9% unique values, suggesting uniqueness constraint
+// ✓ Suggested: matches_email_pattern (confidence: 0.85)
+//   Rationale: Sample values suggest email format
+```
+
+Term analyzes your actual data patterns to recommend the most relevant quality checks!
+
 ## 🎨 What Can You Validate?
 
 <table>
@@ -205,6 +238,7 @@ cargo test
 - ✅ File format support (CSV, JSON, Parquet)
 - ✅ Cloud storage integration
 - ✅ OpenTelemetry support
+- ✅ Data profiling and constraint suggestions
 
 ### Next (v0.0.2)
 
@@ -215,10 +249,10 @@ cargo test
 
 ### Future
 
-- 🎯 Data profiling and suggestions
 - 🎯 Incremental validation
 - 🎯 Distributed execution
 - 🎯 More language bindings
+- 🎯 Advanced ML-based anomaly detection
 
 ## 📄 License
 
