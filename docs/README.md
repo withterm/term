@@ -9,11 +9,13 @@ Welcome to the Term documentation! Our docs are organized using the [Diátaxis](
 
 - [Getting Started](tutorials/01-getting-started.md) - Your first Term validation
 - [Validating CSV Files](tutorials/02-validating-csv-files.md) - Work with CSV data sources
+- [Understanding Analyzers](tutorials/03-understanding-analyzers.md) - Learn data quality analysis
 
 ### 🔧 [How-To Guides](how-to/)
 **Task-oriented** - Practical guides for specific goals
 
 - [Comprehensive Examples](how-to/comprehensive-examples.md) - Complete code examples for all features
+- [Analyze Large Datasets](how-to/analyze-large-datasets.md) - Efficient analysis at scale
 - [Migrate to Unified API](how-to/migrate-to-unified-api.md) - Upgrade from deprecated constraints
 - [Optimize Performance](how-to/optimize-performance.md) - Speed up your validations
 - [Use Cloud Storage](how-to/use-cloud-storage.md) - Validate data in S3, GCS, Azure
@@ -25,6 +27,8 @@ Welcome to the Term documentation! Our docs are organized using the [Diátaxis](
 **Information-oriented** - Complete technical descriptions
 
 - [Constraints Reference](reference/constraints.md) - All available validation constraints
+- [Analyzers Reference](reference/analyzers.md) - Data quality analyzers API
+- [AnalysisRunner Reference](reference/analysis-runner.md) - Analyzer orchestration API
 - [Logical Operators](reference/logical-operators.md) - AND, OR, AtLeast operators
 - [CI Test Data](reference/ci-test-data.md) - Test data generation utilities
 - [API Documentation](https://docs.rs/term-guard) - Complete Rust API docs
@@ -34,6 +38,7 @@ Welcome to the Term documentation! Our docs are organized using the [Diátaxis](
 
 - [Deequ Comparison](explanation/deequ-comparison.md) - How Term compares to AWS Deequ
 - [Architecture](explanation/architecture.md) - Term's design and internals
+- [Analyzer Architecture](explanation/analyzer-architecture.md) - Two-phase computation design
 
 ## Quick Links
 
