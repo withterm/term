@@ -409,8 +409,170 @@ Analyzers return `AnalyzerResult<T>` which may contain:
 3. **Column Types**: Numeric analyzers require Int64 or Float64 columns
 4. **Memory**: Sufficient memory for DataFusion query execution
 
+## Constraint Suggestion System
+
+### Overview
+
+The suggestion system analyzes column profiles to recommend appropriate data quality constraints.
+
+### SuggestionEngine
+
+```rust
+pub struct SuggestionEngine {
+    rules: Vec<Box<dyn ConstraintSuggestionRule>>,
+    confidence_threshold: f64,
+    max_suggestions_per_column: usize,
+}
+```
+
+**Methods:**
+- `new()` - Create engine with default settings
+- `add_rule(rule)` - Add a suggestion rule
+- `confidence_threshold(threshold)` - Set minimum confidence (0.0-1.0)
+- `max_suggestions_per_column(max)` - Limit suggestions per column
+- `suggest_constraints(&profile)` - Generate suggestions for one column
+- `suggest_constraints_batch(&profiles)` - Process multiple columns
+
+### SuggestedConstraint
+
+```rust
+pub struct SuggestedConstraint {
+    pub check_type: String,
+    pub column: String,
+    pub parameters: HashMap<String, ConstraintParameter>,
+    pub confidence: f64,
+    pub rationale: String,
+    pub priority: SuggestionPriority,
+}
+```
+
+### Suggestion Rules
+
+#### CompletenessRule
+
+Analyzes null percentage to suggest completeness constraints.
+
+**Thresholds:**
+- `>98%` complete → `is_complete`
+- `90-98%` complete → `has_completeness` with threshold
+- `<50%` complete → `monitor_completeness` (Critical priority)
+
+**Configuration:**
+```rust
+CompletenessRule::new()
+CompletenessRule::with_thresholds(high: f64, medium: f64)
+```
+
+#### UniquenessRule
+
+Detects potential key columns based on cardinality.
+
+**Thresholds:**
+- `>95%` unique → `is_unique`
+- `80-95%` unique → `has_uniqueness` with monitoring
+- ID/key columns → `primary_key_candidate`
+
+**Configuration:**
+```rust
+UniquenessRule::new()
+UniquenessRule::with_thresholds(high: f64, medium: f64)
+```
+
+#### PatternRule
+
+Identifies common data formats in string columns.
+
+**Detects:**
+- Email patterns → `matches_email_pattern`
+- Date patterns → `matches_date_pattern`
+- Phone patterns → `matches_phone_pattern`
+
+**Configuration:**
+```rust
+PatternRule::new()
+```
+
+#### RangeRule
+
+Suggests bounds for numeric columns.
+
+**Suggestions:**
+- Min/max values → `has_min`, `has_max`
+- Non-negative data → `is_positive`
+- Outlier detection → `has_no_outliers` (based on P99)
+
+**Configuration:**
+```rust
+RangeRule::new()
+```
+
+#### DataTypeRule
+
+Enforces type consistency.
+
+**Cases:**
+- Mixed types → `has_consistent_type` (Critical)
+- Unknown type → `validate_data_type` (High)
+- Consistent type → `has_data_type` with expected type
+
+**Configuration:**
+```rust
+DataTypeRule::new()
+```
+
+#### CardinalityRule
+
+Detects categorical columns and cardinality issues.
+
+**Thresholds:**
+- `≤10` distinct → `is_categorical`
+- With histogram → `is_in_set` with valid values
+- `≤50` distinct → `has_max_cardinality`
+- `>80%` unique → `monitor_cardinality`
+
+**Configuration:**
+```rust
+CardinalityRule::new()
+CardinalityRule::with_thresholds(categorical: u64, low_cardinality: u64)
+```
+
+### Priority Levels
+
+```rust
+pub enum SuggestionPriority {
+    Critical,  // Data quality issues likely to cause failures
+    High,      // Important constraints for data integrity
+    Medium,    // Useful constraints for monitoring
+    Low,       // Optional constraints for completeness
+}
+```
+
+### Example Usage
+
+```rust
+use term_guard::analyzers::{
+    ColumnProfiler, SuggestionEngine,
+    CompletenessRule, UniquenessRule, PatternRule
+};
+
+// Profile column
+let profiler = ColumnProfiler::new();
+let profile = profiler.profile_column(&ctx, "table", "column").await?;
+
+// Configure engine
+let engine = SuggestionEngine::new()
+    .add_rule(Box::new(CompletenessRule::new()))
+    .add_rule(Box::new(UniquenessRule::new()))
+    .add_rule(Box::new(PatternRule::new()))
+    .confidence_threshold(0.8);
+
+// Get suggestions
+let suggestions = engine.suggest_constraints(&profile);
+```
+
 ## See Also
 
 - [`AnalysisRunner`](analysis-runner.md) - Orchestrate multiple analyzers
 - [`MetricValue`](metric-value.md) - Metric value types
 - [Analyzer Architecture](../explanation/analyzer-architecture.md) - Design rationale
+- [How to Use Constraint Suggestions](../how-to/use-constraint-suggestions.md) - Practical guide
