@@ -41,7 +41,7 @@
 //! ## Example Usage
 //!
 //! ```rust,no_run
-//! use term_guard::analyzers::{SuggestionEngine, CompletenessRule, ColumnProfile};
+//! use term_guard::analyzers::{SuggestionEngine, CompletenessRule, ColumnProfile, BasicStatistics, DetectedDataType};
 //! use term_guard::test_fixtures::create_minimal_tpc_h_context;
 //!
 //! # tokio::runtime::Runtime::new().unwrap().block_on(async {
@@ -51,18 +51,18 @@
 //! // In a real scenario, this would come from the ColumnProfiler
 //! let profile = ColumnProfile {
 //!     column_name: "l_orderkey".to_string(),
-//!     data_type: term_guard::analyzers::DetectedDataType::Integer,
-//!     row_count: 1000,
-//!     null_count: 10,
-//!     null_percentage: 0.01,
-//!     distinct_count: 980,
-//!     distinct_percentage: 0.98,
-//!     unique_count: Some(970),
-//!     basic_stats: None,
+//!     data_type: DetectedDataType::Integer,
+//!     basic_stats: BasicStatistics {
+//!         row_count: 1000,
+//!         null_count: 10,
+//!         null_percentage: 0.01,
+//!         approximate_cardinality: 980,
+//!         min_value: Some("1".to_string()),
+//!         max_value: Some("1000".to_string()),
+//!         sample_values: vec!["1".to_string(), "500".to_string(), "1000".to_string()],
+//!     },
 //!     categorical_histogram: None,
 //!     numeric_distribution: None,
-//!     sample_values: vec![],
-//!     pattern_matches: std::collections::HashMap::new(),
 //!     passes_executed: vec![1, 2, 3],
 //!     profiling_time_ms: 50,
 //! };
@@ -85,7 +85,8 @@ pub mod advanced;
 pub mod basic;
 pub mod context;
 pub mod errors;
-pub mod profile_types;
+pub mod inference;
+pub mod profiler;
 pub mod runner;
 pub mod suggestions;
 pub mod traits;
@@ -93,9 +94,13 @@ pub mod types;
 
 pub use context::AnalyzerContext;
 pub use errors::{AnalyzerError, AnalyzerResult};
-pub use profile_types::{
-    BasicStatistics, CategoricalBucket, CategoricalHistogram, ColumnProfile, DetectedDataType,
-    NumericDistribution,
+pub use inference::{
+    InferenceConfig, InferredDataType, TypeInferenceEngine, TypeInferenceEngineBuilder,
+    TypeInferenceResult, TypeStats,
+};
+pub use profiler::{
+    BasicStatistics, CategoricalBucket, CategoricalHistogram, ColumnProfile, ColumnProfiler,
+    ColumnProfilerBuilder, DetectedDataType, NumericDistribution, ProfilerConfig, ProfilerProgress,
 };
 pub use runner::AnalysisRunner;
 pub use suggestions::{

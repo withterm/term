@@ -3632,6 +3632,7 @@ dependencies = [
  "datafusion",
  "futures",
  "glob",
+ "lazy_static",
  "object_store",
  "once_cell",
  "opentelemetry",
