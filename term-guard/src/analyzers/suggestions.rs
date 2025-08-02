@@ -15,7 +15,7 @@
 //! ## Example Usage
 //!
 //! ```rust,no_run
-//! use term_guard::analyzers::{SuggestionEngine, CompletenessRule, ColumnProfile};
+//! use term_guard::analyzers::{SuggestionEngine, CompletenessRule, ColumnProfile, BasicStatistics, DetectedDataType};
 //! use term_guard::test_fixtures::create_minimal_tpc_h_context;
 //!
 //! # tokio::runtime::Runtime::new().unwrap().block_on(async {
@@ -23,18 +23,18 @@
 //! // In a real scenario, profile would come from ColumnProfiler
 //! let profile = ColumnProfile {
 //!     column_name: "l_orderkey".to_string(),
-//!     data_type: term_guard::analyzers::DetectedDataType::Integer,
-//!     row_count: 1000,
-//!     null_count: 10,
-//!     null_percentage: 0.01,
-//!     distinct_count: 980,
-//!     distinct_percentage: 0.98,
-//!     unique_count: Some(970),
-//!     basic_stats: None,
+//!     data_type: DetectedDataType::Integer,
+//!     basic_stats: BasicStatistics {
+//!         row_count: 1000,
+//!         null_count: 10,
+//!         null_percentage: 0.01,
+//!         approximate_cardinality: 980,
+//!         min_value: Some("1".to_string()),
+//!         max_value: Some("1000".to_string()),
+//!         sample_values: vec!["1".to_string(), "500".to_string(), "1000".to_string()],
+//!     },
 //!     categorical_histogram: None,
 //!     numeric_distribution: None,
-//!     sample_values: vec![],
-//!     pattern_matches: std::collections::HashMap::new(),
 //!     passes_executed: vec![1, 2, 3],
 //!     profiling_time_ms: 50,
 //! };
@@ -54,7 +54,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::{debug, instrument};
 
-use crate::analyzers::profile_types::{ColumnProfile, DetectedDataType};
+use crate::analyzers::profiler::{ColumnProfile, DetectedDataType};
 
 /// A suggested constraint with confidence and rationale
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -248,7 +248,7 @@ impl Default for CompletenessRule {
 
 impl ConstraintSuggestionRule for CompletenessRule {
     fn apply(&self, profile: &ColumnProfile) -> Vec<SuggestedConstraint> {
-        let completeness = 1.0 - profile.null_percentage;
+        let completeness = 1.0 - profile.basic_stats.null_percentage;
         let mut suggestions = Vec::new();
 
         if completeness >= self.high_completeness_threshold {
@@ -340,9 +340,9 @@ impl Default for UniquenessRule {
 
 impl ConstraintSuggestionRule for UniquenessRule {
     fn apply(&self, profile: &ColumnProfile) -> Vec<SuggestedConstraint> {
-        let total_rows = profile.row_count as f64;
+        let total_rows = profile.basic_stats.row_count as f64;
         let unique_ratio = if total_rows > 0.0 {
-            profile.distinct_count as f64 / total_rows
+            profile.basic_stats.approximate_cardinality as f64 / total_rows
         } else {
             0.0
         };
@@ -450,8 +450,10 @@ impl ConstraintSuggestionRule for PatternRule {
     fn apply(&self, profile: &ColumnProfile) -> Vec<SuggestedConstraint> {
         let mut suggestions = Vec::new();
 
-        if profile.data_type == DetectedDataType::String && !profile.sample_values.is_empty() {
-            let samples = &profile.sample_values;
+        if profile.data_type == DetectedDataType::String
+            && !profile.basic_stats.sample_values.is_empty()
+        {
+            let samples = &profile.basic_stats.sample_values;
 
             if self.is_email_pattern(samples) {
                 suggestions.push(SuggestedConstraint {
@@ -521,8 +523,14 @@ impl ConstraintSuggestionRule for RangeRule {
 
         match profile.data_type {
             DetectedDataType::Integer | DetectedDataType::Double => {
-                if let Some(ref stats) = profile.basic_stats {
-                    if let (Some(min_val), Some(max_val)) = (stats.min, stats.max) {
+                // Try to get min/max from basic_stats
+                if let (Some(ref min_str), Some(ref max_str)) = (
+                    &profile.basic_stats.min_value,
+                    &profile.basic_stats.max_value,
+                ) {
+                    if let (Ok(min_val), Ok(max_val)) =
+                        (min_str.parse::<f64>(), max_str.parse::<f64>())
+                    {
                         let range = max_val - min_val;
 
                         // Suggest range constraints if the range is reasonable
@@ -712,8 +720,8 @@ impl Default for CardinalityRule {
 impl ConstraintSuggestionRule for CardinalityRule {
     fn apply(&self, profile: &ColumnProfile) -> Vec<SuggestedConstraint> {
         let mut suggestions = Vec::new();
-        let cardinality = profile.distinct_count;
-        let total_rows = profile.row_count;
+        let cardinality = profile.basic_stats.approximate_cardinality;
+        let total_rows = profile.basic_stats.row_count;
 
         if cardinality <= self.low_cardinality_threshold {
             suggestions.push(SuggestedConstraint {
@@ -793,7 +801,7 @@ impl ConstraintSuggestionRule for CardinalityRule {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::analyzers::profile_types::{
+    use crate::analyzers::profiler::{
         BasicStatistics, CategoricalBucket, CategoricalHistogram, DetectedDataType,
         NumericDistribution,
     };
@@ -803,25 +811,17 @@ mod tests {
         ColumnProfile {
             column_name: column_name.to_string(),
             data_type: DetectedDataType::String,
-            row_count: 1000,
-            null_count: (1000.0 * null_percentage) as u64,
-            null_percentage,
-            distinct_count: 500,
-            distinct_percentage: 0.5,
-            unique_count: Some(490),
-            basic_stats: Some(BasicStatistics {
-                count: 1000,
-                null_count: (1000.0 * null_percentage) as i64,
-                distinct_count: Some(500),
-                min: None,
-                max: None,
-                mean: None,
-                std_dev: None,
-            }),
+            basic_stats: BasicStatistics {
+                row_count: 1000,
+                null_count: (1000.0 * null_percentage) as u64,
+                null_percentage,
+                approximate_cardinality: 500,
+                min_value: None,
+                max_value: None,
+                sample_values: vec!["A".to_string(), "B".to_string()],
+            },
             categorical_histogram: None,
             numeric_distribution: None,
-            sample_values: vec!["A".to_string(), "B".to_string()],
-            pattern_matches: HashMap::new(),
             profiling_time_ms: 100,
             passes_executed: vec![1],
         }
@@ -834,30 +834,25 @@ mod tests {
         ColumnProfile {
             column_name: column_name.to_string(),
             data_type: DetectedDataType::Double,
-            row_count: 1000,
-            null_count: 0,
-            null_percentage: 0.0,
-            distinct_count: 800,
-            distinct_percentage: 0.8,
-            unique_count: Some(800),
-            basic_stats: Some(BasicStatistics {
-                count: 1000,
+            basic_stats: BasicStatistics {
+                row_count: 1000,
                 null_count: 0,
-                distinct_count: Some(800),
-                min: Some(min_val),
-                max: Some(max_val),
-                mean: Some((min_val + max_val) / 2.0),
-                std_dev: Some(10.0),
-            }),
+                null_percentage: 0.0,
+                approximate_cardinality: 800,
+                min_value: Some(min_val.to_string()),
+                max_value: Some(max_val.to_string()),
+                sample_values: vec![min_val.to_string(), max_val.to_string()],
+            },
             categorical_histogram: None,
             numeric_distribution: Some(NumericDistribution {
-                min: min_val,
-                max: max_val,
+                mean: Some((min_val + max_val) / 2.0),
+                std_dev: Some(10.0),
+                variance: Some(100.0),
                 quantiles,
-                histogram_buckets: None,
+                outlier_count: 0,
+                skewness: None,
+                kurtosis: None,
             }),
-            sample_values: vec![min_val.to_string(), max_val.to_string()],
-            pattern_matches: HashMap::new(),
             profiling_time_ms: 100,
             passes_executed: vec![1, 3],
         }
@@ -868,50 +863,40 @@ mod tests {
             CategoricalBucket {
                 value: "A".to_string(),
                 count: 400,
-                percentage: 0.4,
             },
             CategoricalBucket {
                 value: "B".to_string(),
                 count: 300,
-                percentage: 0.3,
             },
             CategoricalBucket {
                 value: "C".to_string(),
                 count: 200,
-                percentage: 0.2,
             },
             CategoricalBucket {
                 value: "D".to_string(),
                 count: 100,
-                percentage: 0.1,
             },
         ];
 
         ColumnProfile {
             column_name: column_name.to_string(),
             data_type: DetectedDataType::String,
-            row_count: 1000,
-            null_count: 0,
-            null_percentage: 0.0,
-            distinct_count: cardinality,
-            distinct_percentage: cardinality as f64 / 1000.0,
-            unique_count: Some(cardinality),
-            basic_stats: Some(BasicStatistics {
-                count: 1000,
+            basic_stats: BasicStatistics {
+                row_count: 1000,
                 null_count: 0,
-                distinct_count: Some(cardinality as i64),
-                min: None,
-                max: None,
-                mean: None,
-                std_dev: None,
-            }),
+                null_percentage: 0.0,
+                approximate_cardinality: cardinality,
+                min_value: None,
+                max_value: None,
+                sample_values: vec!["A".to_string(), "B".to_string()],
+            },
             categorical_histogram: Some(CategoricalHistogram {
                 buckets,
                 total_count: 1000,
+                entropy: 1.5,
+                top_values: vec![("A".to_string(), 400), ("B".to_string(), 300)],
             }),
             numeric_distribution: None,
-            sample_values: vec!["A".to_string(), "B".to_string()],
-            pattern_matches: HashMap::new(),
             profiling_time_ms: 100,
             passes_executed: vec![1, 2],
         }
@@ -992,8 +977,7 @@ mod tests {
     fn test_uniqueness_rule_high_uniqueness() {
         let rule = UniquenessRule::new();
         let mut profile = create_test_profile("test_col", 0.0);
-        profile.distinct_count = 980; // 98% unique
-        profile.distinct_percentage = 0.98;
+        profile.basic_stats.approximate_cardinality = 980; // 98% unique
 
         let suggestions = rule.apply(&profile);
         assert_eq!(suggestions.len(), 1);
@@ -1005,8 +989,7 @@ mod tests {
     fn test_uniqueness_rule_id_column() {
         let rule = UniquenessRule::new();
         let mut profile = create_test_profile("user_id", 0.0);
-        profile.distinct_count = 800; // 80% unique
-        profile.distinct_percentage = 0.80;
+        profile.basic_stats.approximate_cardinality = 800; // 80% unique
 
         let suggestions = rule.apply(&profile);
         assert!(suggestions
@@ -1018,7 +1001,7 @@ mod tests {
     fn test_pattern_rule_email() {
         let rule = PatternRule::new();
         let mut profile = create_test_profile("email", 0.0);
-        profile.sample_values = vec![
+        profile.basic_stats.sample_values = vec![
             "user@example.com".to_string(),
             "test@domain.org".to_string(),
         ];

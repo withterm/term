@@ -128,7 +128,10 @@
 //!
 //! Term is built on a modular architecture:
 //!
-//! - **`analyzers`**: Core analyzer framework for computing metrics from data
+//! - **`analyzers`**: Advanced data analysis framework including:
+//!   - Type Inference Engine: Automatic data type detection with confidence scores
+//!   - Column Profiler: Three-pass algorithm for comprehensive column analysis
+//!   - Basic & Advanced Analyzers: Metrics computation (mean, entropy, correlation, etc.)
 //! - **`core`**: Core types like `Check`, `ValidationSuite`, and `ConstraintResult`
 //! - **`constraints`**: All validation constraint implementations
 //! - **`sources`**: Data source connectors and loaders
