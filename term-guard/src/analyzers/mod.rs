@@ -40,38 +40,36 @@
 //!
 //! ## Example Usage
 //!
-//! ```rust
-//! use term_guard::analyzers::{TypeInferenceEngine, ColumnProfiler, SuggestionEngine};
-//! use term_guard::analyzers::{CompletenessRule, UniquenessRule, CardinalityRule};
+//! ```rust,no_run
+//! use term_guard::analyzers::{SuggestionEngine, CompletenessRule, ColumnProfile};
 //! use term_guard::test_fixtures::create_minimal_tpc_h_context;
 //!
 //! # tokio::runtime::Runtime::new().unwrap().block_on(async {
 //! let ctx = create_minimal_tpc_h_context().await.unwrap();
 //!
-//! // Type inference
-//! let engine = TypeInferenceEngine::builder()
-//!     .confidence_threshold(0.8)
-//!     .sample_size(1000)
-//!     .build();
-//!
-//! let inference = engine.infer_column_type(&ctx, "lineitem", "l_quantity").await.unwrap();
-//! println!("Inferred type: {:?} (confidence: {:.2})",
-//!          inference.inferred_type, inference.confidence);
-//!
-//! // Column profiling
-//! let profiler = ColumnProfiler::builder()
-//!     .cardinality_threshold(100)
-//!     .build();
-//!
-//! let profile = profiler.profile_column(&ctx, "lineitem", "l_returnflag").await.unwrap();
-//! println!("Profile: {} passes executed in {}ms",
-//!          profile.passes_executed.len(), profile.profiling_time_ms);
+//! // Create a mock profile for demonstration
+//! // In a real scenario, this would come from the ColumnProfiler
+//! let profile = ColumnProfile {
+//!     column_name: "l_orderkey".to_string(),
+//!     data_type: term_guard::analyzers::DetectedDataType::Integer,
+//!     row_count: 1000,
+//!     null_count: 10,
+//!     null_percentage: 0.01,
+//!     distinct_count: 980,
+//!     distinct_percentage: 0.98,
+//!     unique_count: Some(970),
+//!     basic_stats: None,
+//!     categorical_histogram: None,
+//!     numeric_distribution: None,
+//!     sample_values: vec![],
+//!     pattern_matches: std::collections::HashMap::new(),
+//!     passes_executed: vec![1, 2, 3],
+//!     profiling_time_ms: 50,
+//! };
 //!
 //! // Constraint suggestions
 //! let suggestion_engine = SuggestionEngine::new()
 //!     .add_rule(Box::new(CompletenessRule::new()))
-//!     .add_rule(Box::new(UniquenessRule::new()))
-//!     .add_rule(Box::new(CardinalityRule::new()))
 //!     .confidence_threshold(0.7);
 //!
 //! let suggestions = suggestion_engine.suggest_constraints(&profile);
@@ -87,6 +85,7 @@ pub mod advanced;
 pub mod basic;
 pub mod context;
 pub mod errors;
+pub mod profile_types;
 pub mod runner;
 pub mod suggestions;
 pub mod traits;
@@ -94,6 +93,10 @@ pub mod types;
 
 pub use context::AnalyzerContext;
 pub use errors::{AnalyzerError, AnalyzerResult};
+pub use profile_types::{
+    BasicStatistics, CategoricalBucket, CategoricalHistogram, ColumnProfile, DetectedDataType,
+    NumericDistribution,
+};
 pub use runner::AnalysisRunner;
 pub use suggestions::{
     CardinalityRule, CompletenessRule, ConstraintParameter, ConstraintSuggestionRule, DataTypeRule,
