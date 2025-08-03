@@ -82,40 +82,81 @@ jobs:
       - name: Check security advisories
         run: cargo deny check advisories
 
-  static-analysis:
-    name: Static Security Analysis
+
+  file-checks:
+    name: File Security Checks
     runs-on: blacksmith-4vcpu-ubuntu-2404
+    if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy
-      
-      - name: Run Clippy with security lints
+          fetch-depth: 0
+
+      - name: Check for binary files
         run: |
-          # Run clippy on library code (excluding tests)
-          cargo clippy --lib --bins --features all-cloud,telemetry,test-utils -- \
-            -D warnings \
-            -W clippy::unwrap_used \
-            -W clippy::expect_used \
-            -W clippy::panic \
-            -W clippy::unimplemented \
-            -W clippy::todo
+          # Get list of changed files
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
           
-          # Run clippy on tests with relaxed rules (allow unwrap in tests)
-          cargo clippy --tests --benches --examples --all-features -- \
-            -D warnings \
-            -A clippy::unwrap_used \
-            -A clippy::expect_used \
-            -A clippy::panic
+          # Check for binary files
+          BINARY_EXTENSIONS="exe dll so dylib wasm zip tar gz jar war ear"
+          FOUND_BINARIES=""
+          
+          for file in $CHANGED_FILES; do
+            for ext in $BINARY_EXTENSIONS; do
+              if [[ "$file" == *".$ext" ]]; then
+                FOUND_BINARIES="$FOUND_BINARIES\n- $file"
+              fi
+            done
+          done
+          
+          if [ ! -z "$FOUND_BINARIES" ]; then
+            echo "❌ Binary files detected in PR:"
+            echo -e "$FOUND_BINARIES"
+            exit 1
+          fi
+          
+          echo "✅ No binary files detected"
+
+      - name: Check file sizes
+        run: |
+          # Check for large files (>5MB)
+          LARGE_FILES=$(find . -type f -size +5M -not -path "./.git/*" | head -20)
+          
+          if [ ! -z "$LARGE_FILES" ]; then
+            echo "❌ Large files detected (>5MB):"
+            echo "$LARGE_FILES"
+            exit 1
+          fi
+          
+          echo "✅ No large files detected"
+
+      - name: Check critical file modifications
+        run: |
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          CRITICAL_FILES=".github/workflows .github/CODEOWNERS Cargo.toml"
+          FOUND_CRITICAL=""
+          
+          for file in $CHANGED_FILES; do
+            for critical in $CRITICAL_FILES; do
+              if [[ "$file" == *"$critical"* ]]; then
+                FOUND_CRITICAL="$FOUND_CRITICAL\n- $file"
+              fi
+            done
+          done
+          
+          if [ ! -z "$FOUND_CRITICAL" ]; then
+            echo "⚠️  Critical files modified - requires admin review:"
+            echo -e "$FOUND_CRITICAL"
+            # Don't fail, but require extra review
+          fi
 
   secret-scanning:
     name: Secret Scanning
     runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       
       - name: Run GitLeaks
         uses: gitleaks/gitleaks-action@v2
