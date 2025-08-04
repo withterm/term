@@ -82,9 +82,11 @@
 //! ```
 
 pub mod advanced;
+pub mod anomaly;
 pub mod basic;
 pub mod context;
 pub mod errors;
+pub mod incremental;
 pub mod inference;
 pub mod profiler;
 pub mod runner;
@@ -92,8 +94,16 @@ pub mod suggestions;
 pub mod traits;
 pub mod types;
 
+pub use anomaly::{
+    AbsoluteChangeDetector, Anomaly, AnomalyDetectionConfig, AnomalyDetectionRunner,
+    AnomalyDetectionRunnerBuilder, AnomalyDetector, InMemoryMetricsRepository, MetricDataPoint,
+    MetricsRepository, RelativeRateOfChangeDetector, ZScoreDetector,
+};
 pub use context::AnalyzerContext;
 pub use errors::{AnalyzerError, AnalyzerResult};
+pub use incremental::{
+    FileSystemStateStore, IncrementalAnalysisRunner, IncrementalConfig, StateStore,
+};
 pub use inference::{
     InferenceConfig, InferredDataType, TypeInferenceEngine, TypeInferenceEngineBuilder,
     TypeInferenceResult, TypeStats,
