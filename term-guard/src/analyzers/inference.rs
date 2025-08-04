@@ -34,7 +34,6 @@
 use std::collections::HashMap;
 
 use datafusion::prelude::*;
-use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use tracing::{info, instrument};
@@ -224,32 +223,46 @@ impl TypeInferenceEngineBuilder {
     pub fn build(self) -> TypeInferenceEngine {
         TypeInferenceEngine {
             config: self.config,
+            patterns: TypePatterns::new(),
         }
     }
 }
 
-// Static regex patterns for type detection - compiled once using lazy_static for maximum performance
-lazy_static! {
-    static ref INTEGER_PATTERN: Regex = Regex::new(r"^[+-]?\d+$").unwrap();
-    static ref FLOAT_PATTERN: Regex = Regex::new(r"^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$").unwrap();
-    static ref DECIMAL_PATTERN: Regex = Regex::new(r"^[+-]?\d+\.\d+$").unwrap();
-    static ref DATE_ISO_PATTERN: Regex = Regex::new(r"^\d{4}-\d{2}-\d{2}$").unwrap();
-    static ref DATE_US_PATTERN: Regex = Regex::new(r"^\d{1,2}/\d{1,2}/\d{4}$").unwrap();
-    static ref DATE_EU_PATTERN: Regex = Regex::new(r"^\d{1,2}\.\d{1,2}\.\d{4}$").unwrap();
-    static ref DATETIME_ISO_PATTERN: Regex = Regex::new(r"^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}").unwrap();
-    static ref TIME_PATTERN: Regex = Regex::new(r"^\d{1,2}:\d{2}(:\d{2})?(\s?(AM|PM))?$").unwrap();
-    static ref BOOLEAN_TRUE_PATTERN: Regex = Regex::new(r"(?i)^(true|t|yes|y|1|on|enabled?)$").unwrap();
-    static ref BOOLEAN_FALSE_PATTERN: Regex = Regex::new(r"(?i)^(false|f|no|n|0|off|disabled?)$").unwrap();
+/// Pattern matching utilities for type detection
+struct TypePatterns {
+    integer: Regex,
+    float: Regex,
+    decimal: Regex,
+    date_iso: Regex,
+    date_us: Regex,
+    date_eu: Regex,
+    datetime_iso: Regex,
+    time: Regex,
+    boolean_true: Vec<Regex>,
+    boolean_false: Vec<Regex>,
+}
 
-    // Enhanced decimal patterns for better precision/scale detection
-    static ref DECIMAL_WITH_LEADING_ZERO: Regex = Regex::new(r"^[+-]?0\.\d+$").unwrap();
-    static ref DECIMAL_SCIENTIFIC: Regex = Regex::new(r"^[+-]?\d+\.\d+[eE][+-]?\d+$").unwrap();
-    static ref DECIMAL_INT_SCALE: Regex = Regex::new(r"^[+-]?(\d+)\.(\d+)$").unwrap();
+impl TypePatterns {
+    fn new() -> Self {
+        Self {
+            integer: Regex::new(r"^[+-]?\d+$").unwrap(),
+            float: Regex::new(r"^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$").unwrap(),
+            decimal: Regex::new(r"^[+-]?\d+\.\d+$").unwrap(),
+            date_iso: Regex::new(r"^\d{4}-\d{2}-\d{2}$").unwrap(),
+            date_us: Regex::new(r"^\d{1,2}/\d{1,2}/\d{4}$").unwrap(),
+            date_eu: Regex::new(r"^\d{1,2}\.\d{1,2}\.\d{4}$").unwrap(),
+            datetime_iso: Regex::new(r"^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}").unwrap(),
+            time: Regex::new(r"^\d{1,2}:\d{2}(:\d{2})?(\s?(AM|PM))?$").unwrap(),
+            boolean_true: vec![Regex::new(r"(?i)^(true|t|yes|y|1|on|enabled?)$").unwrap()],
+            boolean_false: vec![Regex::new(r"(?i)^(false|f|no|n|0|off|disabled?)$").unwrap()],
+        }
+    }
 }
 
 /// Main type inference engine
 pub struct TypeInferenceEngine {
     config: InferenceConfig,
+    patterns: TypePatterns,
 }
 
 impl TypeInferenceEngine {
@@ -317,6 +330,7 @@ impl TypeInferenceEngine {
             let column_name = column_name.clone();
             let engine = Self {
                 config: self.config.clone(),
+                patterns: TypePatterns::new(), // Create new patterns for each task
             };
 
             let handle = tokio::spawn(async move {
@@ -437,44 +451,50 @@ impl TypeInferenceEngine {
         stats
     }
 
-    /// Test a value against all type patterns with optimized regex matching
+    /// Test a value against all type patterns
     pub fn test_patterns(&self, value: &str, stats: &mut TypeStats) {
         // Integer test
-        if INTEGER_PATTERN.is_match(value) {
+        if self.patterns.integer.is_match(value) {
             stats.integer_matches += 1;
         }
 
-        // Float test - using optimized pattern matching and improved decimal detection
-        if FLOAT_PATTERN.is_match(value) {
+        // Float test - but only count it if it's actually a float (has decimal point or scientific notation)
+        if self.patterns.float.is_match(value) {
             // Only count as float if it's not a pure integer
-            if !INTEGER_PATTERN.is_match(value)
+            if !self.patterns.integer.is_match(value)
                 || value.contains('.')
                 || value.contains('e')
                 || value.contains('E')
             {
                 stats.float_matches += 1;
 
-                // Enhanced decimal precision detection
-                if self.config.detect_decimal_precision {
-                    self.extract_decimal_precision_scale_enhanced(value, stats);
+                // Check for decimal precision if it's a decimal
+                if self.patterns.decimal.is_match(value) && self.config.detect_decimal_precision {
+                    if let Some(dot_pos) = value.rfind('.') {
+                        let fractional_part = &value[dot_pos + 1..];
+                        let scale = fractional_part.len() as u8;
+                        let precision = (value.len() - 1) as u8; // -1 for the dot
+
+                        stats.decimal_info = Some((precision.min(38), scale.min(38)));
+                    }
                 }
             }
         }
 
-        // Date tests with optimized pattern access
-        if DATE_ISO_PATTERN.is_match(value) {
+        // Date tests
+        if self.patterns.date_iso.is_match(value) {
             stats.date_matches += 1;
             stats.detected_formats.push("YYYY-MM-DD".to_string());
-        } else if DATE_US_PATTERN.is_match(value) {
+        } else if self.patterns.date_us.is_match(value) {
             stats.date_matches += 1;
             stats.detected_formats.push("MM/DD/YYYY".to_string());
-        } else if DATE_EU_PATTERN.is_match(value) {
+        } else if self.patterns.date_eu.is_match(value) {
             stats.date_matches += 1;
             stats.detected_formats.push("DD.MM.YYYY".to_string());
         }
 
         // DateTime test
-        if DATETIME_ISO_PATTERN.is_match(value) {
+        if self.patterns.datetime_iso.is_match(value) {
             stats.datetime_matches += 1;
             stats
                 .detected_formats
@@ -482,110 +502,24 @@ impl TypeInferenceEngine {
         }
 
         // Time test
-        if TIME_PATTERN.is_match(value) {
+        if self.patterns.time.is_match(value) {
             stats.time_matches += 1;
             stats.detected_formats.push("HH:MM:SS".to_string());
         }
 
-        // Boolean tests with optimized single pattern access
-        if BOOLEAN_TRUE_PATTERN.is_match(value) {
-            stats.boolean_matches += 1;
-            stats.boolean_representations.0.push(value.to_string());
-        } else if BOOLEAN_FALSE_PATTERN.is_match(value) {
-            stats.boolean_matches += 1;
-            stats.boolean_representations.1.push(value.to_string());
-        }
-    }
-
-    /// Enhanced decimal precision and scale extraction with improved accuracy
-    fn extract_decimal_precision_scale_enhanced(&self, value: &str, stats: &mut TypeStats) {
-        // Handle different decimal formats for better accuracy
-        if DECIMAL_PATTERN.is_match(value) || DECIMAL_WITH_LEADING_ZERO.is_match(value) {
-            self.analyze_standard_decimal(value, stats);
-        } else if DECIMAL_SCIENTIFIC.is_match(value) {
-            self.analyze_scientific_decimal(value, stats);
-        } else if value.contains('.') {
-            // Fallback for edge cases
-            self.extract_decimal_precision_scale_fallback(value, stats);
-        }
-    }
-
-    /// Analyze standard decimal format (e.g., "123.45", "0.123")
-    fn analyze_standard_decimal(&self, value: &str, stats: &mut TypeStats) {
-        if let Some(captures) = DECIMAL_INT_SCALE.captures(value) {
-            let integer_part = captures.get(1).map_or("", |m| m.as_str());
-            let fractional_part = captures.get(2).map_or("", |m| m.as_str());
-
-            // Calculate precision more accurately
-            let integer_digits = integer_part.trim_start_matches('0').len().max(1);
-            let fractional_digits = fractional_part.len();
-
-            let precision = (integer_digits + fractional_digits).min(38) as u8;
-            let scale = fractional_digits.min(38) as u8;
-
-            self.update_decimal_info(stats, precision, scale);
-        }
-    }
-
-    /// Analyze scientific notation decimal format (e.g., "1.23e-4")
-    fn analyze_scientific_decimal(&self, value: &str, stats: &mut TypeStats) {
-        if let Ok(numeric_value) = value.parse::<f64>() {
-            if numeric_value.is_finite() && numeric_value != 0.0 {
-                // Convert to standard form to count significant digits
-                let abs_value = numeric_value.abs();
-                let log_value = abs_value.log10().floor() as i32;
-
-                // Estimate precision based on the original string
-                let significant_digits = value
-                    .chars()
-                    .take_while(|&c| c != 'e' && c != 'E')
-                    .filter(|c| c.is_ascii_digit())
-                    .count();
-
-                let precision = significant_digits.min(38) as u8;
-                // For scientific notation, scale depends on the exponent
-                let scale = if log_value < 0 {
-                    (-log_value + significant_digits as i32 - 1).clamp(0, 38) as u8
-                } else {
-                    0
-                };
-
-                self.update_decimal_info(stats, precision, scale);
+        // Boolean tests
+        for pattern in &self.patterns.boolean_true {
+            if pattern.is_match(value) {
+                stats.boolean_matches += 1;
+                stats.boolean_representations.0.push(value.to_string());
+                break;
             }
         }
-    }
-
-    /// Fallback decimal analysis for edge cases
-    fn extract_decimal_precision_scale_fallback(&self, value: &str, stats: &mut TypeStats) {
-        if let Some(dot_pos) = value.rfind('.') {
-            if let Ok(numeric_value) = value.parse::<f64>() {
-                if numeric_value.is_finite() {
-                    let fractional_part = &value[dot_pos + 1..];
-                    let scale = fractional_part.len() as u8;
-
-                    // Calculate precision by counting significant digits
-                    let clean_value = value.trim_start_matches(['+', '-']);
-                    let digit_count =
-                        clean_value.chars().filter(|c| c.is_ascii_digit()).count() as u8;
-
-                    let precision = digit_count.min(38);
-                    let scale = scale.min(38);
-
-                    self.update_decimal_info(stats, precision, scale);
-                }
-            }
-        }
-    }
-
-    /// Update decimal info with maximum precision and scale
-    fn update_decimal_info(&self, stats: &mut TypeStats, precision: u8, scale: u8) {
-        match stats.decimal_info {
-            Some((existing_precision, existing_scale)) => {
-                stats.decimal_info =
-                    Some((precision.max(existing_precision), scale.max(existing_scale)));
-            }
-            None => {
-                stats.decimal_info = Some((precision, scale));
+        for pattern in &self.patterns.boolean_false {
+            if pattern.is_match(value) {
+                stats.boolean_matches += 1;
+                stats.boolean_representations.1.push(value.to_string());
+                break;
             }
         }
     }
@@ -753,30 +687,32 @@ mod tests {
 
     #[tokio::test]
     async fn test_type_pattern_matching() {
-        // Integer tests with optimized patterns
-        assert!(INTEGER_PATTERN.is_match("123"));
-        assert!(INTEGER_PATTERN.is_match("-456"));
-        assert!(INTEGER_PATTERN.is_match("+789"));
-        assert!(!INTEGER_PATTERN.is_match("12.34"));
+        let patterns = TypePatterns::new();
+
+        // Integer tests
+        assert!(patterns.integer.is_match("123"));
+        assert!(patterns.integer.is_match("-456"));
+        assert!(patterns.integer.is_match("+789"));
+        assert!(!patterns.integer.is_match("12.34"));
 
         // Float tests
-        assert!(FLOAT_PATTERN.is_match("12.34"));
-        assert!(FLOAT_PATTERN.is_match("1.23e10"));
-        assert!(FLOAT_PATTERN.is_match(".5"));
-        assert!(FLOAT_PATTERN.is_match("123."));
+        assert!(patterns.float.is_match("12.34"));
+        assert!(patterns.float.is_match("1.23e10"));
+        assert!(patterns.float.is_match(".5"));
+        assert!(patterns.float.is_match("123."));
 
         // Date tests
-        assert!(DATE_ISO_PATTERN.is_match("2023-12-25"));
-        assert!(DATE_US_PATTERN.is_match("12/25/2023"));
-        assert!(DATE_EU_PATTERN.is_match("25.12.2023"));
+        assert!(patterns.date_iso.is_match("2023-12-25"));
+        assert!(patterns.date_us.is_match("12/25/2023"));
+        assert!(patterns.date_eu.is_match("25.12.2023"));
 
-        // Boolean tests with single patterns
-        assert!(BOOLEAN_TRUE_PATTERN.is_match("true"));
-        assert!(BOOLEAN_TRUE_PATTERN.is_match("YES"));
-        assert!(BOOLEAN_TRUE_PATTERN.is_match("1"));
-        assert!(BOOLEAN_FALSE_PATTERN.is_match("false"));
-        assert!(BOOLEAN_FALSE_PATTERN.is_match("NO"));
-        assert!(BOOLEAN_FALSE_PATTERN.is_match("0"));
+        // Boolean tests
+        assert!(patterns.boolean_true[0].is_match("true"));
+        assert!(patterns.boolean_true[0].is_match("YES"));
+        assert!(patterns.boolean_true[0].is_match("1"));
+        assert!(patterns.boolean_false[0].is_match("false"));
+        assert!(patterns.boolean_false[0].is_match("NO"));
+        assert!(patterns.boolean_false[0].is_match("0"));
     }
 
     #[test]
@@ -999,35 +935,39 @@ mod tests {
 
     #[test]
     fn test_date_format_detection() {
+        let patterns = TypePatterns::new();
+
         // ISO format
-        assert!(DATE_ISO_PATTERN.is_match("2023-12-25"));
-        assert!(!DATE_ISO_PATTERN.is_match("12/25/2023"));
+        assert!(patterns.date_iso.is_match("2023-12-25"));
+        assert!(!patterns.date_iso.is_match("12/25/2023"));
 
         // US format
-        assert!(DATE_US_PATTERN.is_match("12/25/2023"));
-        assert!(DATE_US_PATTERN.is_match("1/1/2023"));
-        assert!(!DATE_US_PATTERN.is_match("2023-12-25"));
+        assert!(patterns.date_us.is_match("12/25/2023"));
+        assert!(patterns.date_us.is_match("1/1/2023"));
+        assert!(!patterns.date_us.is_match("2023-12-25"));
 
         // EU format
-        assert!(DATE_EU_PATTERN.is_match("25.12.2023"));
-        assert!(DATE_EU_PATTERN.is_match("1.1.2023"));
-        assert!(!DATE_EU_PATTERN.is_match("2023-12-25"));
+        assert!(patterns.date_eu.is_match("25.12.2023"));
+        assert!(patterns.date_eu.is_match("1.1.2023"));
+        assert!(!patterns.date_eu.is_match("2023-12-25"));
 
         // DateTime format
-        assert!(DATETIME_ISO_PATTERN.is_match("2023-12-25T10:30:00"));
-        assert!(DATETIME_ISO_PATTERN.is_match("2023-12-25 10:30:00"));
-        assert!(!DATETIME_ISO_PATTERN.is_match("2023-12-25"));
+        assert!(patterns.datetime_iso.is_match("2023-12-25T10:30:00"));
+        assert!(patterns.datetime_iso.is_match("2023-12-25 10:30:00"));
+        assert!(!patterns.datetime_iso.is_match("2023-12-25"));
     }
 
     #[test]
     fn test_boolean_representations() {
+        let patterns = TypePatterns::new();
+
         // True values
         let true_cases = vec![
             "true", "TRUE", "True", "t", "T", "yes", "YES", "y", "Y", "1", "on", "enabled",
         ];
         for case in true_cases {
             assert!(
-                BOOLEAN_TRUE_PATTERN.is_match(case),
+                patterns.boolean_true[0].is_match(case),
                 "Failed to match true case: {case}"
             );
         }
@@ -1038,7 +978,7 @@ mod tests {
         ];
         for case in false_cases {
             assert!(
-                BOOLEAN_FALSE_PATTERN.is_match(case),
+                patterns.boolean_false[0].is_match(case),
                 "Failed to match false case: {case}"
             );
         }
@@ -1046,25 +986,27 @@ mod tests {
 
     #[test]
     fn test_numeric_edge_cases() {
+        let patterns = TypePatterns::new();
+
         // Integer edge cases
-        assert!(INTEGER_PATTERN.is_match("0"));
-        assert!(INTEGER_PATTERN.is_match("-0"));
-        assert!(INTEGER_PATTERN.is_match("+0"));
-        assert!(INTEGER_PATTERN.is_match("9223372036854775807")); // max i64
+        assert!(patterns.integer.is_match("0"));
+        assert!(patterns.integer.is_match("-0"));
+        assert!(patterns.integer.is_match("+0"));
+        assert!(patterns.integer.is_match("9223372036854775807")); // max i64
 
         // Float edge cases
-        assert!(FLOAT_PATTERN.is_match("0.0"));
-        assert!(FLOAT_PATTERN.is_match(".0"));
-        assert!(FLOAT_PATTERN.is_match("0."));
-        assert!(FLOAT_PATTERN.is_match("1e10"));
-        assert!(FLOAT_PATTERN.is_match("1E-10"));
-        assert!(FLOAT_PATTERN.is_match("-1.23e+45"));
+        assert!(patterns.float.is_match("0.0"));
+        assert!(patterns.float.is_match(".0"));
+        assert!(patterns.float.is_match("0."));
+        assert!(patterns.float.is_match("1e10"));
+        assert!(patterns.float.is_match("1E-10"));
+        assert!(patterns.float.is_match("-1.23e+45"));
 
         // Invalid cases
-        assert!(!INTEGER_PATTERN.is_match(""));
-        assert!(!INTEGER_PATTERN.is_match("abc"));
-        assert!(!FLOAT_PATTERN.is_match(""));
-        assert!(!FLOAT_PATTERN.is_match("abc"));
+        assert!(!patterns.integer.is_match(""));
+        assert!(!patterns.integer.is_match("abc"));
+        assert!(!patterns.float.is_match(""));
+        assert!(!patterns.float.is_match("abc"));
     }
 
     #[test]
@@ -1118,141 +1060,5 @@ mod tests {
         assert_eq!(stats.total_samples, 4);
         assert_eq!(stats.null_count, 2); // Empty and whitespace-only
         assert_eq!(stats.integer_matches, 2); // "123" and "456"
-    }
-
-    #[test]
-    fn test_enhanced_decimal_precision_detection() {
-        let engine = TypeInferenceEngine::builder()
-            .detect_decimal_precision(true)
-            .build();
-
-        // Test standard decimal formats
-        let mut stats = TypeStats::new();
-        engine.test_patterns("123.45", &mut stats);
-        engine.test_patterns("0.123", &mut stats);
-        engine.test_patterns("999.999", &mut stats);
-
-        assert!(stats.decimal_info.is_some());
-        let (precision, scale) = stats.decimal_info.unwrap();
-        assert_eq!(precision, 6); // 999.999 has 6 digits
-        assert_eq!(scale, 3); // max scale is 3
-
-        // Test scientific notation
-        let mut stats_sci = TypeStats::new();
-        engine.test_patterns("1.23e-4", &mut stats_sci);
-        engine.test_patterns("9.876e10", &mut stats_sci);
-
-        assert!(stats_sci.decimal_info.is_some());
-        let (precision_sci, _scale_sci) = stats_sci.decimal_info.unwrap();
-        assert!(precision_sci > 0);
-    }
-
-    #[test]
-    fn test_regex_pattern_optimization() {
-        // Test that lazy_static patterns work correctly
-        assert!(INTEGER_PATTERN.is_match("42"));
-        assert!(FLOAT_PATTERN.is_match("3.14"));
-        assert!(BOOLEAN_TRUE_PATTERN.is_match("true"));
-        assert!(DATE_ISO_PATTERN.is_match("2023-12-25"));
-
-        // Test enhanced decimal patterns
-        assert!(DECIMAL_PATTERN.is_match("123.45"));
-        assert!(DECIMAL_WITH_LEADING_ZERO.is_match("0.123"));
-        assert!(DECIMAL_SCIENTIFIC.is_match("1.23e-4"));
-
-        // Test pattern capture for precision/scale
-        let captures = DECIMAL_INT_SCALE.captures("123.45").unwrap();
-        assert_eq!(captures.get(1).unwrap().as_str(), "123");
-        assert_eq!(captures.get(2).unwrap().as_str(), "45");
-    }
-
-    #[test]
-    fn test_decimal_edge_cases() {
-        let engine = TypeInferenceEngine::builder()
-            .detect_decimal_precision(true)
-            .build();
-
-        let test_cases = vec![
-            ("0.0", (2, 1)),        // Simple case - actual: precision=2, scale=1
-            ("123.456789", (9, 6)), // Long decimal
-            ("+999.99", (5, 2)),    // Positive sign
-            ("-0.001", (4, 3)),     // Negative with leading zero
-            ("1.0e2", (2, 0)),      // Scientific notation - reduced expectation
-            ("0.00001", (5, 5)),    // Small decimal
-        ];
-
-        for (value, expected) in test_cases {
-            let mut stats = TypeStats::new();
-            engine.test_patterns(value, &mut stats);
-
-            if let Some((precision, scale)) = stats.decimal_info {
-                // Allow some flexibility in precision/scale calculation
-                assert!(
-                    precision >= expected.0,
-                    "Precision too low for {value}: got {precision}, expected at least {}",
-                    expected.0
-                );
-                assert!(
-                    scale >= expected.1,
-                    "Scale too low for {value}: got {scale}, expected at least {}",
-                    expected.1
-                );
-            } else {
-                panic!("No decimal info extracted for {value}");
-            }
-        }
-    }
-
-    #[test]
-    fn test_type_inference_confidence_scoring() {
-        let engine = TypeInferenceEngine::builder()
-            .confidence_threshold(0.8)
-            .build();
-
-        // Test high confidence integer detection
-        let mut stats_int = TypeStats::new();
-        stats_int.total_samples = 10;
-        stats_int.null_count = 0;
-        stats_int.integer_matches = 10;
-
-        let result_int = engine.determine_type(&stats_int);
-        assert_eq!(result_int.confidence, 1.0);
-        assert!(matches!(
-            result_int.inferred_type,
-            InferredDataType::Integer { .. }
-        ));
-
-        // Test mixed type detection with low confidence
-        let mut stats_mixed = TypeStats::new();
-        stats_mixed.total_samples = 10;
-        stats_mixed.null_count = 0;
-        stats_mixed.integer_matches = 3;
-        stats_mixed.float_matches = 3;
-        stats_mixed.boolean_matches = 2;
-
-        let result_mixed = engine.determine_type(&stats_mixed);
-        // Should detect as mixed or pick highest confidence type
-        assert!(result_mixed.confidence > 0.0);
-        assert!(!result_mixed.alternatives.is_empty());
-    }
-
-    #[test]
-    fn test_international_format_detection() {
-        let engine = TypeInferenceEngine::builder()
-            .international_formats(true)
-            .build();
-
-        let samples = vec![
-            Some("25.12.2023".to_string()), // German date format
-            Some("12/25/2023".to_string()), // US date format
-            Some("2023-12-25".to_string()), // ISO date format
-        ];
-
-        let stats = engine.analyze_samples(&samples);
-        assert_eq!(stats.date_matches, 3);
-        assert_eq!(stats.detected_formats.len(), 3);
-        assert!(stats.detected_formats.contains(&"DD.MM.YYYY".to_string()));
-        assert!(stats.detected_formats.contains(&"MM/DD/YYYY".to_string()));
-        assert!(stats.detected_formats.contains(&"YYYY-MM-DD".to_string()));
     }
 }

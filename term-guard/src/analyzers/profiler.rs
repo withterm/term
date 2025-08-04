@@ -60,43 +60,6 @@ pub struct ProfilerConfig {
     pub max_memory_bytes: u64,
     /// Enable parallel processing where possible
     pub enable_parallel: bool,
-    /// DataFusion memory pool configuration
-    pub memory_pool: MemoryPoolConfig,
-}
-
-/// Memory pool configuration for DataFusion
-#[derive(Debug, Clone)]
-pub struct MemoryPoolConfig {
-    /// Memory pool size in bytes (None uses DataFusion defaults)
-    pub size: Option<u64>,
-    /// Memory pool type
-    pub pool_type: MemoryPoolType,
-    /// Maximum number of partitions for parallel processing
-    pub max_partitions: Option<usize>,
-    /// Enable memory manager optimizations
-    pub enable_memory_manager: bool,
-}
-
-/// Types of memory pools available
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MemoryPoolType {
-    /// Greedy memory pool (default) - fast allocation, may use more memory
-    Greedy,
-    /// Fair memory pool - slower but more memory-efficient
-    Fair,
-    /// Unbounded memory pool - no memory limits (use with caution)
-    Unbounded,
-}
-
-impl Default for MemoryPoolConfig {
-    fn default() -> Self {
-        Self {
-            size: None, // Use DataFusion defaults
-            pool_type: MemoryPoolType::Greedy,
-            max_partitions: None,
-            enable_memory_manager: true,
-        }
-    }
 }
 
 impl Default for ProfilerConfig {
@@ -106,7 +69,6 @@ impl Default for ProfilerConfig {
             sample_size: 10000,
             max_memory_bytes: 512 * 1024 * 1024, // 512MB
             enable_parallel: true,
-            memory_pool: MemoryPoolConfig::default(),
         }
     }
 }
@@ -227,36 +189,6 @@ impl ColumnProfilerBuilder {
         self
     }
 
-    /// Set DataFusion memory pool size in bytes
-    pub fn datafusion_memory_pool_size(mut self, size: u64) -> Self {
-        self.config.memory_pool.size = Some(size);
-        self
-    }
-
-    /// Configure the memory pool type
-    pub fn memory_pool_type(mut self, pool_type: MemoryPoolType) -> Self {
-        self.config.memory_pool.pool_type = pool_type;
-        self
-    }
-
-    /// Set maximum number of partitions for parallel processing
-    pub fn max_partitions(mut self, max_partitions: usize) -> Self {
-        self.config.memory_pool.max_partitions = Some(max_partitions);
-        self
-    }
-
-    /// Enable or disable memory manager optimizations
-    pub fn enable_memory_manager(mut self, enable: bool) -> Self {
-        self.config.memory_pool.enable_memory_manager = enable;
-        self
-    }
-
-    /// Configure memory pool with custom configuration
-    pub fn memory_pool_config(mut self, config: MemoryPoolConfig) -> Self {
-        self.config.memory_pool = config;
-        self
-    }
-
     /// Set progress callback
     pub fn progress_callback<F>(mut self, callback: F) -> Self
     where
@@ -288,51 +220,6 @@ impl ColumnProfiler {
             config: ProfilerConfig::default(),
             progress_callback: None,
         }
-    }
-
-    /// Apply memory pool configuration to a SessionContext
-    pub fn configure_session_context(&self, _ctx: &SessionContext) -> ProfilerResult<()> {
-        // Note: DataFusion 48.0 has limited runtime configuration options
-        // This method provides a placeholder for future memory pool configuration
-        // when DataFusion exposes more runtime configuration APIs
-
-        if let Some(size) = self.config.memory_pool.size {
-            // Log the intended memory pool size for debugging
-            tracing::info!(
-                memory_pool_size = size,
-                pool_type = ?self.config.memory_pool.pool_type,
-                "Memory pool configuration requested (runtime configuration pending DataFusion API)"
-            );
-        }
-
-        Ok(())
-    }
-
-    /// Create a new SessionContext with optimized memory configuration
-    pub fn create_optimized_session_context(&self) -> ProfilerResult<SessionContext> {
-        let mut config = datafusion::execution::config::SessionConfig::default();
-
-        // Configure batch size based on memory constraints
-        if let Some(memory_size) = self.config.memory_pool.size {
-            // Estimate optimal batch size based on available memory
-            let estimated_batch_size = (memory_size / (1024 * 1024)).clamp(1024, 8192) as usize;
-            config = config.with_batch_size(estimated_batch_size);
-        }
-
-        // Configure partitions for parallel processing
-        if let Some(max_partitions) = self.config.memory_pool.max_partitions {
-            config = config.with_target_partitions(max_partitions);
-        }
-
-        // Enable memory manager optimizations
-        if self.config.memory_pool.enable_memory_manager {
-            // Future: Configure memory manager when API becomes available
-            tracing::debug!("Memory manager optimizations enabled");
-        }
-
-        let ctx = SessionContext::new_with_config(config);
-
-        Ok(ctx)
     }
 
     /// Create a ColumnProfiler with default configuration
@@ -887,14 +774,14 @@ impl ColumnProfiler {
         column_name: &str,
         percentile: f64,
     ) -> ProfilerResult<f64> {
-        // Try to use DataFusion's approx_percentile function first
-        let approx_sql = format!(
+        // Try to use DataFusion's approx_percentile function
+        let sql = format!(
             "SELECT approx_percentile(CAST({column_name} AS DOUBLE), {percentile}) as percentile_val
              FROM {table_name} 
              WHERE {column_name} IS NOT NULL"
         );
 
-        match ctx.sql(&approx_sql).await {
+        match ctx.sql(&sql).await {
             Ok(df) => {
                 let batches = df
                     .collect()
@@ -907,185 +794,19 @@ impl ColumnProfiler {
                         return Ok(value);
                     }
                 }
+
+                // Fallback: return an error so we skip this percentile
+                Err(AnalyzerError::invalid_data(
+                    "No percentile result".to_string(),
+                ))
             }
             Err(_) => {
-                // approx_percentile function not available, use fallback method
-                return self
-                    .calculate_percentile_fallback(ctx, table_name, column_name, percentile)
-                    .await;
+                // Function not available, try simpler approach or skip
+                Err(AnalyzerError::invalid_data(
+                    "Percentile function not available".to_string(),
+                ))
             }
         }
-
-        // If approx_percentile returned no result, try fallback
-        self.calculate_percentile_fallback(ctx, table_name, column_name, percentile)
-            .await
-    }
-
-    /// Enhanced fallback percentile calculation with linear interpolation
-    async fn calculate_percentile_fallback(
-        &self,
-        ctx: &SessionContext,
-        table_name: &str,
-        column_name: &str,
-        percentile: f64,
-    ) -> ProfilerResult<f64> {
-        // First, get the count of non-null values
-        let count_sql = format!(
-            "SELECT COUNT(*) as total_count FROM {table_name} WHERE {column_name} IS NOT NULL"
-        );
-
-        let count_df = ctx
-            .sql(&count_sql)
-            .await
-            .map_err(|e| AnalyzerError::execution(e.to_string()))?;
-        let count_batches = count_df
-            .collect()
-            .await
-            .map_err(|e| AnalyzerError::execution(e.to_string()))?;
-
-        if count_batches.is_empty() || count_batches[0].num_rows() == 0 {
-            return Err(AnalyzerError::invalid_data(
-                "No data found for percentile calculation".to_string(),
-            ));
-        }
-
-        let total_count = self.extract_u64(&count_batches[0], 0, "total_count")?;
-        if total_count == 0 {
-            return Err(AnalyzerError::invalid_data(
-                "No non-null values for percentile calculation".to_string(),
-            ));
-        }
-
-        // For small datasets, use simple position calculation
-        if total_count <= 100 {
-            return self
-                .calculate_percentile_simple(ctx, table_name, column_name, percentile, total_count)
-                .await;
-        }
-
-        // For larger datasets, use linear interpolation method for more accuracy
-        let position = percentile * (total_count - 1) as f64;
-        let lower_index = position.floor() as u64;
-        let upper_index = position.ceil() as u64;
-        let fraction = position - position.floor();
-
-        if lower_index == upper_index {
-            // Exact position, no interpolation needed
-            let percentile_sql = format!(
-                "SELECT CAST({column_name} AS DOUBLE) as value 
-                 FROM {table_name} 
-                 WHERE {column_name} IS NOT NULL 
-                 ORDER BY {column_name} 
-                 LIMIT 1 OFFSET {lower_index}"
-            );
-
-            let percentile_df = ctx
-                .sql(&percentile_sql)
-                .await
-                .map_err(|e| AnalyzerError::execution(e.to_string()))?;
-            let percentile_batches = percentile_df
-                .collect()
-                .await
-                .map_err(|e| AnalyzerError::execution(e.to_string()))?;
-
-            if !percentile_batches.is_empty() && percentile_batches[0].num_rows() > 0 {
-                let batch = &percentile_batches[0];
-                if let Some(value) = self.extract_optional_f64(batch, 0)? {
-                    return Ok(value);
-                }
-            }
-        } else {
-            // Linear interpolation between two values
-            let range_sql = format!(
-                "SELECT CAST({column_name} AS DOUBLE) as value 
-                 FROM {table_name} 
-                 WHERE {column_name} IS NOT NULL 
-                 ORDER BY {column_name} 
-                 LIMIT 2 OFFSET {lower_index}"
-            );
-
-            let range_df = ctx
-                .sql(&range_sql)
-                .await
-                .map_err(|e| AnalyzerError::execution(e.to_string()))?;
-            let range_batches = range_df
-                .collect()
-                .await
-                .map_err(|e| AnalyzerError::execution(e.to_string()))?;
-
-            if !range_batches.is_empty() && range_batches[0].num_rows() >= 2 {
-                let batch = &range_batches[0];
-                if let (Some(lower_value), Some(upper_value)) = (
-                    self.extract_optional_f64(batch, 0)?,
-                    // Extract from row 1
-                    if batch.num_rows() > 1 {
-                        let column = batch.column(0);
-                        if !column.is_null(1) {
-                            column
-                                .as_any()
-                                .downcast_ref::<arrow::array::Float64Array>()
-                                .map(|arr| arr.value(1))
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    },
-                ) {
-                    // Linear interpolation: lower + fraction * (upper - lower)
-                    let interpolated_value = lower_value + fraction * (upper_value - lower_value);
-                    return Ok(interpolated_value);
-                } else if let Some(lower_value) = self.extract_optional_f64(batch, 0)? {
-                    // Fallback to single value if upper value not available
-                    return Ok(lower_value);
-                }
-            }
-        }
-
-        Err(AnalyzerError::invalid_data(
-            "Failed to calculate percentile using enhanced fallback method".to_string(),
-        ))
-    }
-
-    /// Simple percentile calculation for small datasets
-    async fn calculate_percentile_simple(
-        &self,
-        ctx: &SessionContext,
-        table_name: &str,
-        column_name: &str,
-        percentile: f64,
-        total_count: u64,
-    ) -> ProfilerResult<f64> {
-        let position = ((total_count as f64 * percentile).ceil() as u64).max(1);
-        let offset = position - 1;
-
-        let percentile_sql = format!(
-            "SELECT CAST({column_name} AS DOUBLE) as value 
-             FROM {table_name} 
-             WHERE {column_name} IS NOT NULL 
-             ORDER BY {column_name} 
-             LIMIT 1 OFFSET {offset}"
-        );
-
-        let percentile_df = ctx
-            .sql(&percentile_sql)
-            .await
-            .map_err(|e| AnalyzerError::execution(e.to_string()))?;
-        let percentile_batches = percentile_df
-            .collect()
-            .await
-            .map_err(|e| AnalyzerError::execution(e.to_string()))?;
-
-        if !percentile_batches.is_empty() && percentile_batches[0].num_rows() > 0 {
-            let batch = &percentile_batches[0];
-            if let Some(value) = self.extract_optional_f64(batch, 0)? {
-                return Ok(value);
-            }
-        }
-
-        Err(AnalyzerError::invalid_data(
-            "Failed to calculate percentile using simple method".to_string(),
-        ))
     }
 
     fn calculate_entropy(&self, buckets: &[CategoricalBucket], total_count: u64) -> f64 {
@@ -1121,51 +842,12 @@ mod tests {
             .sample_size(5000)
             .max_memory_bytes(1024 * 1024 * 1024) // 1GB
             .enable_parallel(false)
-            .datafusion_memory_pool_size(256 * 1024 * 1024) // 256MB
             .build();
 
         assert_eq!(profiler.config.cardinality_threshold, 200);
         assert_eq!(profiler.config.sample_size, 5000);
         assert_eq!(profiler.config.max_memory_bytes, 1024 * 1024 * 1024);
         assert!(!profiler.config.enable_parallel);
-        assert_eq!(profiler.config.memory_pool.size, Some(256 * 1024 * 1024));
-
-        // Test memory pool configuration methods
-        let profiler_advanced = ColumnProfiler::builder()
-            .memory_pool_type(MemoryPoolType::Fair)
-            .max_partitions(4)
-            .enable_memory_manager(false)
-            .build();
-
-        assert_eq!(
-            profiler_advanced.config.memory_pool.pool_type,
-            MemoryPoolType::Fair
-        );
-        assert_eq!(profiler_advanced.config.memory_pool.max_partitions, Some(4));
-        assert!(!profiler_advanced.config.memory_pool.enable_memory_manager);
-
-        // Test custom memory pool config
-        let custom_config = MemoryPoolConfig {
-            size: Some(1024 * 1024 * 1024), // 1GB
-            pool_type: MemoryPoolType::Unbounded,
-            max_partitions: Some(8),
-            enable_memory_manager: true,
-        };
-
-        let profiler_custom = ColumnProfiler::builder()
-            .memory_pool_config(custom_config.clone())
-            .build();
-
-        assert_eq!(
-            profiler_custom.config.memory_pool.size,
-            Some(1024 * 1024 * 1024)
-        );
-        assert_eq!(
-            profiler_custom.config.memory_pool.pool_type,
-            MemoryPoolType::Unbounded
-        );
-        assert_eq!(profiler_custom.config.memory_pool.max_partitions, Some(8));
-        assert!(profiler_custom.config.memory_pool.enable_memory_manager);
     }
 
     #[tokio::test]
@@ -1192,134 +874,5 @@ mod tests {
             .build();
 
         // Progress callback functionality will be tested in integration tests
-    }
-
-    #[tokio::test]
-    async fn test_memory_pool_configuration() {
-        let profiler = ColumnProfiler::builder()
-            .memory_pool_type(MemoryPoolType::Fair)
-            .max_partitions(8)
-            .datafusion_memory_pool_size(1024 * 1024 * 1024) // 1GB
-            .enable_memory_manager(false)
-            .build();
-
-        assert_eq!(profiler.config.memory_pool.pool_type, MemoryPoolType::Fair);
-        assert_eq!(profiler.config.memory_pool.max_partitions, Some(8));
-        assert_eq!(profiler.config.memory_pool.size, Some(1024 * 1024 * 1024));
-        assert!(!profiler.config.memory_pool.enable_memory_manager);
-
-        // Test optimized session context creation
-        let ctx = profiler.create_optimized_session_context();
-        assert!(ctx.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_percentile_calculation_methods() {
-        // This test would need actual data - placeholder for integration tests
-        let _profiler = ColumnProfiler::new();
-
-        // Test simple percentile calculation logic
-        let total_count = 100u64;
-        let percentile = 0.95;
-        let position = percentile * (total_count - 1) as f64;
-        let lower_index = position.floor() as u64;
-        let upper_index = position.ceil() as u64;
-
-        // Position should be 94.05, so floor=94, ceil=95
-        assert_eq!(lower_index, 94);
-        assert_eq!(upper_index, 95); // Different values, interpolation needed
-        assert!(position > 94.0 && position < 95.0); // Rough range check
-
-        // Test interpolation case
-        let total_count_small = 10u64;
-        let position_small = percentile * (total_count_small - 1) as f64;
-        let lower_small = position_small.floor() as u64;
-        let upper_small = position_small.ceil() as u64;
-
-        // Position should be 8.55, so lower=8, upper=9
-        assert_eq!(lower_small, 8);
-        assert_eq!(upper_small, 9); // Different values, interpolation needed
-        assert!(position_small > 8.0 && position_small < 9.0);
-    }
-
-    #[tokio::test]
-    async fn test_enhanced_data_type_classification() {
-        let profiler = ColumnProfiler::new();
-
-        // Test various data type classifications
-        assert_eq!(profiler.classify_value("true"), DetectedDataType::Boolean);
-        assert_eq!(profiler.classify_value("false"), DetectedDataType::Boolean);
-        assert_eq!(profiler.classify_value("123"), DetectedDataType::Integer);
-        assert_eq!(profiler.classify_value("123.45"), DetectedDataType::Double);
-        assert_eq!(
-            profiler.classify_value("2023-12-25"),
-            DetectedDataType::Date
-        );
-        assert_eq!(
-            profiler.classify_value("2023-12-25T10:30:00"),
-            DetectedDataType::Timestamp
-        );
-        assert_eq!(
-            profiler.classify_value("hello world"),
-            DetectedDataType::String
-        );
-
-        // Test edge cases
-        assert_eq!(profiler.classify_value("0"), DetectedDataType::Integer);
-        assert_eq!(profiler.classify_value("0.0"), DetectedDataType::Double);
-        assert_eq!(profiler.classify_value(" "), DetectedDataType::String);
-    }
-
-    #[tokio::test]
-    async fn test_memory_pool_type_enum() {
-        // Test enum functionality
-        let greedy = MemoryPoolType::Greedy;
-        let fair = MemoryPoolType::Fair;
-        let unbounded = MemoryPoolType::Unbounded;
-
-        assert_ne!(greedy, fair);
-        assert_ne!(fair, unbounded);
-        assert_ne!(greedy, unbounded);
-
-        // Test debug formatting
-        assert_eq!(format!("{greedy:?}"), "Greedy");
-        assert_eq!(format!("{fair:?}"), "Fair");
-        assert_eq!(format!("{unbounded:?}"), "Unbounded");
-    }
-
-    #[tokio::test]
-    async fn test_memory_pool_config_defaults() {
-        let default_config = MemoryPoolConfig::default();
-
-        assert_eq!(default_config.pool_type, MemoryPoolType::Greedy);
-        assert_eq!(default_config.size, None);
-        assert_eq!(default_config.max_partitions, None);
-        assert!(default_config.enable_memory_manager);
-    }
-
-    #[tokio::test]
-    async fn test_profiler_config_builder_chain() {
-        let profiler = ColumnProfiler::builder()
-            .cardinality_threshold(500)
-            .sample_size(20000)
-            .max_memory_bytes(2 * 1024 * 1024 * 1024) // 2GB
-            .enable_parallel(false)
-            .memory_pool_type(MemoryPoolType::Unbounded)
-            .max_partitions(16)
-            .enable_memory_manager(true)
-            .datafusion_memory_pool_size(512 * 1024 * 1024) // 512MB
-            .build();
-
-        assert_eq!(profiler.config.cardinality_threshold, 500);
-        assert_eq!(profiler.config.sample_size, 20000);
-        assert_eq!(profiler.config.max_memory_bytes, 2 * 1024 * 1024 * 1024);
-        assert!(!profiler.config.enable_parallel);
-        assert_eq!(
-            profiler.config.memory_pool.pool_type,
-            MemoryPoolType::Unbounded
-        );
-        assert_eq!(profiler.config.memory_pool.max_partitions, Some(16));
-        assert!(profiler.config.memory_pool.enable_memory_manager);
-        assert_eq!(profiler.config.memory_pool.size, Some(512 * 1024 * 1024));
     }
 }
