@@ -131,9 +131,8 @@ impl FileSystemStateStore {
         let base_path = base_path.as_ref().to_path_buf();
 
         // Ensure base directory exists
-        std::fs::create_dir_all(&base_path).map_err(|e| {
-            AnalyzerError::Custom(format!("Failed to create state directory: {e}"))
-        })?;
+        std::fs::create_dir_all(&base_path)
+            .map_err(|e| AnalyzerError::Custom(format!("Failed to create state directory: {e}")))?;
 
         Ok(Self { base_path })
     }
