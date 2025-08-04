@@ -90,3 +90,7 @@ name = "column_profiler_benchmarks"
 [[bench]]
 harness = false
 name = "type_inference_benchmarks"
+
+[[bench]]
+harness = false
+name = "kll_sketch_bench"

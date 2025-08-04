@@ -196,18 +196,194 @@ pub trait MetricsRepository: Send + Sync {
     }
 }
 
-/// In-memory implementation of MetricsRepository for testing.
+/// Configuration for in-memory metrics repository.
+#[derive(Debug, Clone)]
+pub struct InMemoryMetricsConfig {
+    /// Maximum number of data points per metric (default: 10,000).
+    pub max_points_per_metric: usize,
+    /// Maximum total number of metrics (default: 1,000).
+    pub max_metrics: usize,
+    /// Maximum age of data points in seconds (default: 30 days).
+    pub max_age_seconds: i64,
+}
+
+impl Default for InMemoryMetricsConfig {
+    fn default() -> Self {
+        Self {
+            max_points_per_metric: 10_000,
+            max_metrics: 1_000,
+            max_age_seconds: 30 * 24 * 60 * 60, // 30 days
+        }
+    }
+}
+
+/// In-memory implementation of MetricsRepository for testing and development.
+///
+/// **Security Note**: This implementation includes memory limits to prevent OOM attacks
+/// when used in production scenarios. Configure limits appropriately for your use case.
+#[derive(Clone)]
 pub struct InMemoryMetricsRepository {
     data: Arc<tokio::sync::RwLock<HashMap<String, Vec<MetricDataPoint>>>>,
+    config: InMemoryMetricsConfig,
 }
 
 impl InMemoryMetricsRepository {
-    /// Creates a new in-memory metrics repository.
+    /// Creates a new in-memory metrics repository with default limits.
     pub fn new() -> Self {
+        Self::with_config(InMemoryMetricsConfig::default())
+    }
+
+    /// Creates a new in-memory metrics repository with custom configuration.
+    pub fn with_config(config: InMemoryMetricsConfig) -> Self {
         Self {
             data: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
+            config,
         }
     }
+
+    /// Returns the current memory usage statistics.
+    pub async fn memory_stats(&self) -> MemoryStats {
+        let data = self.data.read().await;
+        let mut total_points = 0;
+        let mut oldest_timestamp = None;
+        let mut newest_timestamp = None;
+
+        for history in data.values() {
+            total_points += history.len();
+            for point in history {
+                match oldest_timestamp {
+                    None => oldest_timestamp = Some(point.timestamp),
+                    Some(oldest) if point.timestamp < oldest => {
+                        oldest_timestamp = Some(point.timestamp)
+                    }
+                    _ => {}
+                }
+                match newest_timestamp {
+                    None => newest_timestamp = Some(point.timestamp),
+                    Some(newest) if point.timestamp > newest => {
+                        newest_timestamp = Some(point.timestamp)
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        MemoryStats {
+            total_metrics: data.len(),
+            total_data_points: total_points,
+            oldest_data_point: oldest_timestamp,
+            newest_data_point: newest_timestamp,
+            estimated_memory_bytes: Self::estimate_memory_usage(&data),
+        }
+    }
+
+    /// Estimates memory usage in bytes.
+    fn estimate_memory_usage(data: &HashMap<String, Vec<MetricDataPoint>>) -> usize {
+        let mut size = std::mem::size_of::<HashMap<String, Vec<MetricDataPoint>>>();
+
+        for (key, values) in data {
+            size += std::mem::size_of::<String>() + key.len();
+            size += std::mem::size_of::<Vec<MetricDataPoint>>();
+            size += values.len() * std::mem::size_of::<MetricDataPoint>();
+
+            // Estimate metadata size
+            for point in values {
+                for (k, v) in &point.metadata {
+                    size += std::mem::size_of::<String>() * 2 + k.len() + v.len();
+                }
+            }
+        }
+
+        size
+    }
+
+    /// Performs cleanup of old data points based on configuration limits.
+    async fn cleanup_if_needed(&self) {
+        let mut data = self.data.write().await;
+
+        // Remove metrics if we exceed the limit
+        if data.len() > self.config.max_metrics {
+            warn!(
+                current_metrics = data.len(),
+                max_metrics = self.config.max_metrics,
+                "Metrics limit exceeded, removing oldest metrics"
+            );
+
+            // Keep the most recently updated metrics
+            let mut metrics_by_latest: Vec<_> = data
+                .iter()
+                .map(|(name, points)| {
+                    let latest = points.iter().map(|p| p.timestamp).max().unwrap_or_default();
+                    (name.clone(), latest)
+                })
+                .collect();
+
+            metrics_by_latest.sort_by(|a, b| b.1.cmp(&a.1)); // Sort by latest timestamp desc
+
+            // Remove oldest metrics
+            let to_remove = metrics_by_latest.len() - self.config.max_metrics;
+            for (metric_name, _) in metrics_by_latest.iter().skip(self.config.max_metrics) {
+                data.remove(metric_name);
+            }
+
+            info!(
+                removed_metrics = to_remove,
+                remaining_metrics = data.len(),
+                "Cleaned up old metrics"
+            );
+        }
+
+        // Clean up old data points and enforce per-metric limits
+        let cutoff_time = Utc::now() - Duration::seconds(self.config.max_age_seconds);
+        let mut total_points_removed = 0;
+
+        for (metric_name, points) in data.iter_mut() {
+            let original_len = points.len();
+
+            // Remove points older than cutoff
+            points.retain(|p| p.timestamp >= cutoff_time);
+
+            // Limit points per metric (keep most recent)
+            if points.len() > self.config.max_points_per_metric {
+                points.sort_by_key(|p| p.timestamp);
+                let to_keep = points.len() - self.config.max_points_per_metric;
+                points.drain(0..to_keep);
+            }
+
+            let removed = original_len - points.len();
+            if removed > 0 {
+                total_points_removed += removed;
+                debug!(
+                    metric = metric_name,
+                    removed_points = removed,
+                    remaining_points = points.len(),
+                    "Cleaned up old data points"
+                );
+            }
+        }
+
+        if total_points_removed > 0 {
+            info!(
+                total_removed = total_points_removed,
+                "Completed data point cleanup"
+            );
+        }
+    }
+}
+
+/// Memory usage statistics for the in-memory repository.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryStats {
+    /// Total number of metrics stored.
+    pub total_metrics: usize,
+    /// Total number of data points across all metrics.
+    pub total_data_points: usize,
+    /// Timestamp of the oldest data point.
+    pub oldest_data_point: Option<DateTime<Utc>>,
+    /// Timestamp of the newest data point.
+    pub newest_data_point: Option<DateTime<Utc>>,
+    /// Estimated memory usage in bytes.
+    pub estimated_memory_bytes: usize,
 }
 
 impl Default for InMemoryMetricsRepository {
@@ -224,15 +400,45 @@ impl MetricsRepository for InMemoryMetricsRepository {
         value: MetricValue,
         timestamp: DateTime<Utc>,
     ) -> AnalyzerResult<()> {
-        let mut data = self.data.write().await;
-        let entry = data.entry(metric_name.to_string()).or_insert_with(Vec::new);
-        entry.push(MetricDataPoint {
-            value,
-            timestamp,
-            metadata: HashMap::new(),
-        });
-        // Keep entries sorted by timestamp
-        entry.sort_by_key(|dp| dp.timestamp);
+        // Check limits before storing
+        {
+            let data = self.data.read().await;
+            if data.len() >= self.config.max_metrics && !data.contains_key(metric_name) {
+                return Err(AnalyzerError::Custom(format!(
+                    "Maximum metrics limit ({}) exceeded",
+                    self.config.max_metrics
+                )));
+            }
+
+            if let Some(existing) = data.get(metric_name) {
+                if existing.len() >= self.config.max_points_per_metric {
+                    // Will be handled by cleanup, but log a warning
+                    warn!(
+                        metric = metric_name,
+                        current_points = existing.len(),
+                        max_points = self.config.max_points_per_metric,
+                        "Metric approaching memory limit"
+                    );
+                }
+            }
+        }
+
+        // Store the new data point
+        {
+            let mut data = self.data.write().await;
+            let entry = data.entry(metric_name.to_string()).or_insert_with(Vec::new);
+            entry.push(MetricDataPoint {
+                value,
+                timestamp,
+                metadata: HashMap::new(),
+            });
+            // Keep entries sorted by timestamp
+            entry.sort_by_key(|dp| dp.timestamp);
+        }
+
+        // Perform cleanup if needed (async to avoid holding lock too long)
+        self.cleanup_if_needed().await;
+
         Ok(())
     }
 
@@ -317,6 +523,13 @@ impl AnomalyDetector for RelativeRateOfChangeDetector {
         // Get the most recent historical value
         let previous = history.last().unwrap();
 
+        debug!(
+            metric = metric_name,
+            current = ?current_value,
+            previous = ?previous.value,
+            "Comparing values for rate of change"
+        );
+
         // Calculate rate of change for numeric metrics
         match (current_value, &previous.value) {
             (MetricValue::Long(current), MetricValue::Long(previous)) => {
@@ -325,6 +538,13 @@ impl AnomalyDetector for RelativeRateOfChangeDetector {
                 }
 
                 let rate_of_change = ((*current - *previous) as f64).abs() / (*previous as f64);
+
+                debug!(
+                    metric = metric_name,
+                    rate_of_change = rate_of_change,
+                    threshold = self.max_rate_of_change,
+                    "Calculated rate of change"
+                );
 
                 if rate_of_change > self.max_rate_of_change {
                     let anomaly = Anomaly::new(
@@ -339,10 +559,7 @@ impl AnomalyDetector for RelativeRateOfChangeDetector {
                         ),
                     )
                     .with_expected_value(MetricValue::Long(*previous))
-                    .with_metadata(
-                        "rate_of_change".to_string(),
-                        format!("{rate_of_change:.4}"),
-                    );
+                    .with_metadata("rate_of_change".to_string(), format!("{rate_of_change:.4}"));
 
                     return Ok(Some(anomaly));
                 }
@@ -367,10 +584,7 @@ impl AnomalyDetector for RelativeRateOfChangeDetector {
                         ),
                     )
                     .with_expected_value(MetricValue::Double(*previous))
-                    .with_metadata(
-                        "rate_of_change".to_string(),
-                        format!("{rate_of_change:.4}"),
-                    );
+                    .with_metadata("rate_of_change".to_string(), format!("{rate_of_change:.4}"));
 
                     return Ok(Some(anomaly));
                 }
@@ -643,6 +857,10 @@ impl AnomalyDetectionRunner {
     ) -> AnalyzerResult<Vec<Anomaly>> {
         let mut anomalies = Vec::new();
 
+        // Remember the current time BEFORE storing metrics
+        // Subtract 1ms to ensure current metrics stored after this time are excluded
+        let detection_time = Utc::now() - chrono::Duration::milliseconds(1);
+
         // Store current metrics if configured
         if self.config.store_current_metrics {
             self.repository.store_context(context).await?;
@@ -653,12 +871,19 @@ impl AnomalyDetectionRunner {
             for (pattern, detector) in &self.detectors {
                 // Check if metric name matches pattern
                 if self.matches_pattern(metric_name, pattern) {
-                    // Get historical data
+                    // Get historical data, excluding the current timestamp
                     let since = Utc::now() - self.config.default_history_window;
                     let history = self
                         .repository
-                        .get_metric_history(metric_name, Some(since), None, None)
+                        .get_metric_history(metric_name, Some(since), Some(detection_time), None)
                         .await?;
+
+                    debug!(
+                        metric = metric_name,
+                        history_size = history.len(),
+                        current_value = ?metric_value,
+                        "Running anomaly detection"
+                    );
 
                     // Run detection
                     match detector.detect(metric_name, metric_value, &history).await {
@@ -817,6 +1042,71 @@ mod tests {
         assert!(result.is_some());
         let anomaly = result.unwrap();
         assert_eq!(anomaly.detection_strategy, "ZScore");
+    }
+
+    #[tokio::test]
+    async fn test_in_memory_repository_memory_limits() {
+        // Test with small limits
+        let config = InMemoryMetricsConfig {
+            max_metrics: 2,
+            max_points_per_metric: 3,
+            max_age_seconds: 60,
+        };
+        let repo = InMemoryMetricsRepository::with_config(config);
+
+        let now = Utc::now();
+
+        // Add metrics up to the limit
+        repo.store_metric("metric1", MetricValue::Long(100), now)
+            .await
+            .unwrap();
+        repo.store_metric("metric2", MetricValue::Long(200), now)
+            .await
+            .unwrap();
+
+        // Third metric should fail
+        let result = repo
+            .store_metric("metric3", MetricValue::Long(300), now)
+            .await;
+        assert!(result.is_err());
+
+        // Check memory stats
+        let stats = repo.memory_stats().await;
+        assert_eq!(stats.total_metrics, 2);
+        assert_eq!(stats.total_data_points, 2);
+
+        // Add more points to existing metrics (should work)
+        repo.store_metric(
+            "metric1",
+            MetricValue::Long(101),
+            now + Duration::seconds(1),
+        )
+        .await
+        .unwrap();
+        repo.store_metric(
+            "metric1",
+            MetricValue::Long(102),
+            now + Duration::seconds(2),
+        )
+        .await
+        .unwrap();
+        repo.store_metric(
+            "metric1",
+            MetricValue::Long(103),
+            now + Duration::seconds(3),
+        )
+        .await
+        .unwrap();
+
+        // Check that cleanup has happened (should only keep 3 points per metric)
+        let history = repo
+            .get_metric_history("metric1", None, None, None)
+            .await
+            .unwrap();
+        assert!(history.len() <= 3);
+
+        let final_stats = repo.memory_stats().await;
+        assert!(final_stats.estimated_memory_bytes > 0);
     }
 
     #[tokio::test]
