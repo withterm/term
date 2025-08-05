@@ -168,7 +168,7 @@
 //! # }
 //! ```
 
-use crate::core::{Constraint, ConstraintMetadata, ConstraintResult};
+use crate::core::{current_validation_context, Constraint, ConstraintMetadata, ConstraintResult};
 use crate::prelude::*;
 use crate::security::SqlSecurity;
 use arrow::array::Array;
@@ -179,7 +179,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::RwLock;
 use tracing::instrument;
-
 /// Lazy static pattern cache for compiled regex patterns
 static PATTERN_CACHE: Lazy<RwLock<HashMap<String, String>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
@@ -693,6 +692,10 @@ impl Constraint for FormatConstraint {
         threshold = %self.threshold
     ))]
     async fn evaluate(&self, ctx: &SessionContext) -> Result<ConstraintResult> {
+        // Get the table name from the validation context
+        let validation_ctx = current_validation_context();
+        let table_name = validation_ctx.table_name();
+
         let column_identifier = SqlSecurity::escape_identifier(&self.column)?;
         let pattern = self.format.get_pattern()?;
         let escaped_pattern = SqlSecurity::validate_regex_pattern(&pattern)?;
@@ -715,14 +718,14 @@ impl Constraint for FormatConstraint {
                 "SELECT 
                     COUNT(CASE WHEN {column_expr} {pattern_operator} '{escaped_pattern}' OR {column_identifier} IS NULL THEN 1 END) as matches,
                     COUNT(*) as total
-                 FROM data"
+                 FROM {table_name}"
             )
         } else {
             format!(
                 "SELECT 
                     COUNT(CASE WHEN {column_expr} {pattern_operator} '{escaped_pattern}' THEN 1 END) as matches,
                     COUNT(*) as total
-                 FROM data"
+                 FROM {table_name}"
             )
         };
 
@@ -845,6 +848,7 @@ mod tests {
     use datafusion::datasource::MemTable;
     use std::sync::Arc;
 
+    use crate::test_helpers::evaluate_constraint_with_context;
     async fn create_test_context(values: Vec<Option<&str>>) -> SessionContext {
         let ctx = SessionContext::new();
 
@@ -875,7 +879,9 @@ mod tests {
 
         let constraint = FormatConstraint::email("text_col", 0.7).unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(0.75)); // 3 out of 4 are emails
         assert_eq!(constraint.name(), "email");
@@ -893,7 +899,9 @@ mod tests {
 
         let constraint = FormatConstraint::url("text_col", 0.7, false).unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(0.75)); // 3 out of 4 are URLs
         assert_eq!(constraint.name(), "url");
@@ -911,7 +919,9 @@ mod tests {
 
         let constraint = FormatConstraint::url("text_col", 0.7, true).unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(0.75)); // 3 out of 4 are URLs (including localhost)
     }
@@ -929,7 +939,9 @@ mod tests {
         // Expect no more than 80% to be credit card numbers
         let constraint = FormatConstraint::credit_card("text_col", 0.8, true).unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(constraint.name(), "credit_card");
     }
@@ -946,7 +958,9 @@ mod tests {
 
         let constraint = FormatConstraint::phone("text_col", 0.7, Some("US".to_string())).unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(constraint.name(), "phone");
     }
@@ -963,7 +977,9 @@ mod tests {
 
         let constraint = FormatConstraint::postal_code("text_col", 0.7, "US").unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(0.75)); // 3 out of 4 are valid US postal codes
         assert_eq!(constraint.name(), "postal_code");
@@ -981,7 +997,9 @@ mod tests {
 
         let constraint = FormatConstraint::uuid("text_col", 0.7).unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(0.75)); // 3 out of 4 are UUIDs
         assert_eq!(constraint.name(), "uuid");
@@ -999,7 +1017,9 @@ mod tests {
 
         let constraint = FormatConstraint::ipv4("text_col", 0.7).unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(0.75)); // 3 out of 4 are valid IPv4
         assert_eq!(constraint.name(), "ipv4");
@@ -1017,7 +1037,9 @@ mod tests {
 
         let constraint = FormatConstraint::ipv6("text_col", 0.7).unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(0.75)); // 3 out of 4 are valid IPv6
         assert_eq!(constraint.name(), "ipv6");
@@ -1035,7 +1057,9 @@ mod tests {
 
         let constraint = FormatConstraint::json("text_col", 0.7).unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(0.75)); // 3 out of 4 look like JSON
         assert_eq!(constraint.name(), "json");
@@ -1053,7 +1077,9 @@ mod tests {
 
         let constraint = FormatConstraint::iso8601_datetime("text_col", 0.7).unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(0.75)); // 3 out of 4 are ISO 8601
         assert_eq!(constraint.name(), "iso8601_datetime");
@@ -1072,7 +1098,9 @@ mod tests {
         // Pattern to match 3 letters followed by 3 digits
         let constraint = FormatConstraint::regex("text_col", r"^[A-Z]{3}\d{3}$", 0.7).unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(0.75)); // 3 out of 4 match
         assert_eq!(constraint.name(), "regex");
@@ -1097,7 +1125,9 @@ mod tests {
         )
         .unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(0.75)); // 3 out of 4 match (case insensitive)
     }
@@ -1120,7 +1150,9 @@ mod tests {
         )
         .unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(0.75)); // 3 out of 4 are emails after trimming
     }
@@ -1139,7 +1171,9 @@ mod tests {
         )
         .unwrap();
 
-        let result1 = constraint1.evaluate(&ctx).await.unwrap();
+        let result1 = evaluate_constraint_with_context(&constraint1, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result1.status, ConstraintStatus::Success);
         assert_eq!(result1.metric, Some(0.75)); // 1 email + 2 nulls out of 4
 
@@ -1152,7 +1186,9 @@ mod tests {
         )
         .unwrap();
 
-        let result2 = constraint2.evaluate(&ctx).await.unwrap();
+        let result2 = evaluate_constraint_with_context(&constraint2, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result2.status, ConstraintStatus::Success);
         assert_eq!(result2.metric, Some(0.25)); // Only 1 email out of 4
     }
@@ -1169,7 +1205,9 @@ mod tests {
 
         let constraint = FormatConstraint::email("text_col", 0.5).unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert_eq!(result.metric, Some(0.0)); // No values are emails
         assert!(result.message.is_some());
@@ -1180,7 +1218,9 @@ mod tests {
         let ctx = create_test_context(vec![]).await;
         let constraint = FormatConstraint::email("text_col", 0.9).unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Skipped);
     }
 

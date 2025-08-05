@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use tracing::instrument;
 
 use crate::analyzers::{Analyzer, AnalyzerError, AnalyzerResult, AnalyzerState, MetricValue};
+use crate::core::current_validation_context;
 
 /// Analyzer that infers data types and detects type inconsistencies.
 ///
@@ -119,6 +120,10 @@ impl Analyzer for DataTypeAnalyzer {
 
     #[instrument(skip(ctx), fields(analyzer = "data_type", column = %self.column))]
     async fn compute_state_from_data(&self, ctx: &SessionContext) -> AnalyzerResult<Self::State> {
+        // Get the table name from the validation context
+        let validation_ctx = current_validation_context();
+        let table_name = validation_ctx.table_name();
+
         // Build SQL query to categorize values by their inferred type
         // This uses SQL type checking functions to infer types
         let sql = format!(
@@ -139,7 +144,7 @@ impl Analyzer for DataTypeAnalyzer {
                     ELSE 'string'
                 END as inferred_type,
                 COUNT(*) as count
-            FROM data
+            FROM {table_name}
             WHERE {0} IS NOT NULL
             GROUP BY inferred_type
             "#,

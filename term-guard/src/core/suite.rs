@@ -49,6 +49,8 @@ pub struct ValidationSuite {
     telemetry: Option<Arc<TermTelemetry>>,
     /// Optional query optimizer for improving performance
     use_optimizer: bool,
+    /// The name of the table to validate (defaults to "data")
+    table_name: String,
 }
 
 impl ValidationSuite {
@@ -91,7 +93,19 @@ impl ValidationSuite {
                     TermSpan::noop()
                 };
 
-                match constraint.evaluate(ctx).await {
+                // Run constraint evaluation with the proper table context
+                let validation_ctx =
+                    match crate::core::ValidationContext::new(self.table_name.clone()) {
+                        Ok(ctx) => ctx,
+                        Err(e) => {
+                            return Err(e);
+                        }
+                    };
+                let result = crate::core::validation_context::CURRENT_CONTEXT
+                    .scope(validation_ctx, constraint.evaluate(ctx))
+                    .await;
+
+                match result {
                     Ok(result) => {
                         // Record constraint result in telemetry
                         if let Some(telemetry) = &self.telemetry {
@@ -423,7 +437,8 @@ impl ValidationSuite {
                 metrics.increment_validation_runs(&attrs);
 
                 // Try to get row count from the data table
-                if let Ok(df) = ctx.sql("SELECT COUNT(*) as row_count FROM data").await {
+                let table_query = format!("SELECT COUNT(*) as row_count FROM {}", self.table_name);
+                if let Ok(df) = ctx.sql(&table_query).await {
                     if let Ok(batches) = df.collect().await {
                         if !batches.is_empty() && batches[0].num_rows() > 0 {
                             if let Some(array) = batches[0]
@@ -525,6 +540,7 @@ pub struct ValidationSuiteBuilder {
     checks: Vec<Arc<Check>>,
     telemetry: Option<Arc<TermTelemetry>>,
     use_optimizer: bool,
+    table_name: String,
 }
 
 impl ValidationSuiteBuilder {
@@ -536,6 +552,7 @@ impl ValidationSuiteBuilder {
             checks: Vec::new(),
             telemetry: None,
             use_optimizer: false,
+            table_name: "data".to_string(),
         }
     }
 
@@ -546,6 +563,30 @@ impl ValidationSuiteBuilder {
     /// * `description` - A description of the suite's purpose
     pub fn description(mut self, description: impl Into<String>) -> Self {
         self.description = Some(description.into());
+        self
+    }
+
+    /// Sets the table name to validate.
+    ///
+    /// By default, validation runs against a table named "data". Use this method
+    /// to validate a different table, which is especially useful when working with
+    /// database sources.
+    ///
+    /// # Arguments
+    ///
+    /// * `table_name` - The name of the table to validate
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use term_guard::core::ValidationSuite;
+    ///
+    /// let suite = ValidationSuite::builder("customer_validation")
+    ///     .table_name("customer_transactions")
+    ///     .build();
+    /// ```
+    pub fn table_name(mut self, table_name: impl Into<String>) -> Self {
+        self.table_name = table_name.into();
         self
     }
 
@@ -618,6 +659,7 @@ impl ValidationSuiteBuilder {
             checks: self.checks,
             telemetry: self.telemetry,
             use_optimizer: self.use_optimizer,
+            table_name: self.table_name,
         }
     }
 }

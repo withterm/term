@@ -14,8 +14,8 @@ mod csv;
 mod json;
 mod parquet;
 
-// #[cfg(feature = "database")]
-// mod database;
+#[cfg(feature = "database")]
+mod database;
 
 #[cfg(feature = "cloud-storage")]
 mod cloud;
@@ -24,17 +24,17 @@ pub use csv::{CsvOptions, CsvSource};
 pub use json::{JsonOptions, JsonSource};
 pub use parquet::{ParquetOptions, ParquetSource};
 
-// #[cfg(feature = "database")]
-// pub use database::{DatabaseConfig, DatabaseSource};
+#[cfg(feature = "database")]
+pub use database::{DatabaseConfig, DatabaseSource};
 
-// #[cfg(all(feature = "database", feature = "postgres"))]
-// pub use database::PostgresSource;
+#[cfg(all(feature = "database", feature = "postgres"))]
+pub use database::PostgresSource;
 
-// #[cfg(all(feature = "database", feature = "mysql"))]
-// pub use database::MySqlSource;
+#[cfg(all(feature = "database", feature = "mysql"))]
+pub use database::MySqlSource;
 
-// #[cfg(all(feature = "database", feature = "sqlite"))]
-// pub use database::SqliteSource;
+#[cfg(all(feature = "database", feature = "sqlite"))]
+pub use database::SqliteSource;
 
 #[cfg(feature = "cloud-storage")]
 pub use cloud::{AzureConfig, GcsConfig, S3Config};

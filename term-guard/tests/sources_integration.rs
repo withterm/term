@@ -326,6 +326,21 @@ mod database_tests {
     #[allow(unused_imports)]
     use super::*;
 
+    #[cfg(feature = "database")]
+    use term_guard::sources::{DatabaseConfig, DatabaseSource};
+
+    #[cfg(feature = "database")]
+    use term_guard::security::SecureString;
+
+    #[cfg(all(feature = "database", feature = "postgres"))]
+    use term_guard::sources::PostgresSource;
+
+    #[cfg(all(feature = "database", feature = "mysql"))]
+    use term_guard::sources::MySqlSource;
+
+    #[cfg(all(feature = "database", feature = "sqlite"))]
+    use term_guard::sources::SqliteSource;
+
     #[tokio::test]
     #[allow(unexpected_cfgs)]
     async fn test_database_config_creation() {

@@ -2,7 +2,6 @@
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
-
 /// An assertion that can be evaluated against a numeric value.
 ///
 /// Used by statistical constraints to define success criteria.
