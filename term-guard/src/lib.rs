@@ -177,6 +177,9 @@ pub mod security;
 pub mod sources;
 pub mod telemetry;
 
+#[cfg(test)]
+pub mod test_helpers;
+
 #[cfg(any(test, feature = "test-utils"))]
 pub mod test_utils;
 

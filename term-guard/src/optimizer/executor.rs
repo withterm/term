@@ -206,13 +206,17 @@ impl OptimizedExecutor {
             if optimized_sql.to_lowercase().contains(" where ") {
                 // Append predicates to existing WHERE clause
                 let predicates_str = pushdown_predicates.join(" AND ");
-                optimized_sql = optimized_sql
-                    .replace(" FROM data", &format!(" FROM data WHERE {predicates_str}"));
+                optimized_sql = optimized_sql.replace(
+                    " FROM {table_name}",
+                    &format!(" FROM {{table_name}} WHERE {predicates_str}"),
+                );
             } else if optimized_sql.to_lowercase().contains(" from ") {
                 // Add WHERE clause after FROM
                 let predicates_str = pushdown_predicates.join(" AND ");
-                optimized_sql = optimized_sql
-                    .replace(" FROM data", &format!(" FROM data WHERE {predicates_str}"));
+                optimized_sql = optimized_sql.replace(
+                    " FROM {table_name}",
+                    &format!(" FROM {{table_name}} WHERE {predicates_str}"),
+                );
             }
 
             debug!(

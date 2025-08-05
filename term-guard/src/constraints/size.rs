@@ -1,12 +1,11 @@
 //! Size constraint for checking row counts.
 
 use crate::constraints::Assertion;
-use crate::core::{Constraint, ConstraintMetadata, ConstraintResult};
+use crate::core::{current_validation_context, Constraint, ConstraintMetadata, ConstraintResult};
 use crate::prelude::*;
 use async_trait::async_trait;
 use datafusion::prelude::*;
 use tracing::{debug, instrument};
-
 /// A constraint that checks the size (row count) of the data.
 ///
 /// This constraint validates that the total number of rows in the dataset
@@ -58,10 +57,16 @@ impl Constraint for SizeConstraint {
             "Starting size constraint evaluation"
         );
         // Build SQL query to count rows
-        let sql = "SELECT COUNT(*) as row_count FROM data";
+        // Get the table name from the validation context
+
+        let validation_ctx = current_validation_context();
+
+        let table_name = validation_ctx.table_name();
+
+        let sql = format!("SELECT COUNT(*) as row_count FROM {table_name}");
 
         // Execute query
-        let df = ctx.sql(sql).await?;
+        let df = ctx.sql(&sql).await?;
         let batches = df.collect().await?;
 
         // Extract results
@@ -138,6 +143,7 @@ mod tests {
     use datafusion::datasource::MemTable;
     use std::sync::Arc;
 
+    use crate::test_helpers::evaluate_constraint_with_context;
     async fn create_test_context(num_rows: usize) -> SessionContext {
         let ctx = SessionContext::new();
 
@@ -165,7 +171,9 @@ mod tests {
         let ctx = create_test_context(100).await;
         let constraint = SizeConstraint::new(Assertion::Equals(100.0));
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(100.0));
     }
@@ -175,7 +183,9 @@ mod tests {
         let ctx = create_test_context(50).await;
         let constraint = SizeConstraint::new(Assertion::GreaterThan(25.0));
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(50.0));
     }
@@ -185,7 +195,9 @@ mod tests {
         let ctx = create_test_context(75).await;
         let constraint = SizeConstraint::new(Assertion::Between(50.0, 100.0));
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(75.0));
     }
@@ -195,7 +207,9 @@ mod tests {
         let ctx = create_test_context(10).await;
         let constraint = SizeConstraint::new(Assertion::GreaterThan(50.0));
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert_eq!(result.metric, Some(10.0));
     }
@@ -205,7 +219,9 @@ mod tests {
         let ctx = create_test_context(0).await;
         let constraint = SizeConstraint::new(Assertion::Equals(0.0));
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(0.0));
     }

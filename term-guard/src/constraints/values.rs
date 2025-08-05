@@ -1,12 +1,11 @@
 //! Value-based validation constraints.
 
-use crate::core::{Constraint, ConstraintMetadata, ConstraintResult};
+use crate::core::{current_validation_context, Constraint, ConstraintMetadata, ConstraintResult};
 use crate::prelude::*;
 use arrow::array::Array;
 use async_trait::async_trait;
 use datafusion::prelude::*;
 use tracing::instrument;
-
 /// Supported data types for validation.
 #[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)]
@@ -105,11 +104,17 @@ impl Constraint for DataTypeConstraint {
     async fn evaluate(&self, ctx: &SessionContext) -> Result<ConstraintResult> {
         let pattern = self.data_type.pattern();
 
+        // Get the table name from the validation context
+
+        let validation_ctx = current_validation_context();
+
+        let table_name = validation_ctx.table_name();
+
         let sql = format!(
             "SELECT 
                 COUNT(CASE WHEN {} ~ '{pattern}' THEN 1 END) as matches,
                 COUNT(*) as total
-             FROM data
+             FROM {table_name}
              WHERE {} IS NOT NULL",
             self.column, self.column
         );
@@ -225,6 +230,10 @@ impl ContainmentConstraint {
 impl Constraint for ContainmentConstraint {
     #[instrument(skip(self, ctx), fields(column = %self.column, allowed_count = %self.allowed_values.len()))]
     async fn evaluate(&self, ctx: &SessionContext) -> Result<ConstraintResult> {
+        // Get the table name from the validation context
+        let validation_ctx = current_validation_context();
+        let table_name = validation_ctx.table_name();
+
         // Create IN clause with allowed values
         let values_list = self
             .allowed_values
@@ -237,7 +246,7 @@ impl Constraint for ContainmentConstraint {
             "SELECT 
                 COUNT(CASE WHEN {} IN ({values_list}) THEN 1 END) as valid_values,
                 COUNT(*) as total
-             FROM data
+             FROM {table_name}
              WHERE {} IS NOT NULL",
             self.column, self.column
         );
@@ -346,12 +355,16 @@ impl NonNegativeConstraint {
 impl Constraint for NonNegativeConstraint {
     #[instrument(skip(self, ctx), fields(column = %self.column))]
     async fn evaluate(&self, ctx: &SessionContext) -> Result<ConstraintResult> {
+        // Get the table name from the validation context
+        let validation_ctx = current_validation_context();
+        let table_name = validation_ctx.table_name();
+
         // Check if all values are >= 0
         let sql = format!(
             "SELECT 
                 COUNT(CASE WHEN CAST({} AS DOUBLE) >= 0 THEN 1 END) as non_negative,
                 COUNT(*) as total
-             FROM data
+             FROM {table_name}
              WHERE {} IS NOT NULL",
             self.column, self.column
         );
@@ -427,6 +440,7 @@ mod tests {
     use datafusion::datasource::MemTable;
     use std::sync::Arc;
 
+    use crate::test_helpers::evaluate_constraint_with_context;
     async fn create_string_test_context(values: Vec<Option<&str>>) -> SessionContext {
         let ctx = SessionContext::new();
 
@@ -470,7 +484,9 @@ mod tests {
 
         let constraint = DataTypeConstraint::new("text_col", DataType::Integer, 0.7);
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(0.75)); // 3 out of 4 are integers
     }
@@ -482,7 +498,9 @@ mod tests {
 
         let constraint = DataTypeConstraint::new("text_col", DataType::Float, 0.7);
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(0.75)); // 3 out of 4 are floats
     }
@@ -494,7 +512,9 @@ mod tests {
 
         let constraint = DataTypeConstraint::new("text_col", DataType::Boolean, 0.7);
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(0.75)); // 3 out of 4 are booleans
     }
@@ -514,7 +534,9 @@ mod tests {
             vec!["active", "inactive", "pending", "archived"],
         );
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert_eq!(result.metric, Some(0.75)); // 3 out of 4 are in allowed set
     }
@@ -529,7 +551,9 @@ mod tests {
             vec!["active", "inactive", "pending", "archived"],
         );
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(1.0)); // All values are in allowed set
     }
@@ -541,7 +565,9 @@ mod tests {
 
         let constraint = NonNegativeConstraint::new("num_col");
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(1.0)); // All values are non-negative
     }
@@ -553,7 +579,9 @@ mod tests {
 
         let constraint = NonNegativeConstraint::new("num_col");
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert_eq!(result.metric, Some(0.75)); // 3 out of 4 are non-negative
     }
@@ -565,7 +593,9 @@ mod tests {
 
         let constraint = ContainmentConstraint::new("text_col", vec!["active", "inactive"]);
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(1.0)); // All non-null values are valid
     }

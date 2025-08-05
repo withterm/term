@@ -16,9 +16,9 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   RUSTFLAGS: -D warnings
-  CARGO_INCREMENTAL: 1
-  CARGO_BUILD_JOBS: 4
-  RUST_TEST_THREADS: 4
+  CARGO_INCREMENTAL: 1  # Enable for better caching
+  CARGO_BUILD_JOBS: 4   # Match Blacksmith vCPU count
+  RUST_TEST_THREADS: 4  # Match Blacksmith vCPU count
   RUST_BACKTRACE: 1
 
 jobs:
@@ -40,15 +40,44 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
 
-      - uses: Swatinem/rust-cache@v2
+      - name: Cache Rust dependencies
+        uses: useblacksmith/cache@v6
         with:
-          key: ${{ runner.os }}-${{ matrix.rust }}
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ matrix.rust }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ matrix.rust }}-
+            ${{ runner.os }}-cargo-
+
+      - name: Cache Statistics (Before)
+        run: |
+          echo "=== Cache Statistics (Before Build) ==="
+          echo "Cargo registry: $(du -sh ~/.cargo/registry 2>/dev/null | cut -f1 || echo 'Not found')"
+          echo "Cargo git: $(du -sh ~/.cargo/git 2>/dev/null | cut -f1 || echo 'Not found')"
+          echo "Target dir: $(du -sh target 2>/dev/null | cut -f1 || echo 'Not found')"
+
+      - name: Build dependencies first
+        run: |
+          # Build dependencies separately for better caching
+          cargo build --all-features --lib --bins
+          cargo build --all-features --tests --no-run
 
       - name: Run tests
         run: cargo test --all-features
 
       - name: Run tests (no default features)
         run: cargo test --no-default-features
+
+      - name: Cache Statistics (After)
+        if: always()
+        run: |
+          echo "=== Cache Statistics (After Build) ==="
+          echo "Cargo registry: $(du -sh ~/.cargo/registry | cut -f1)"
+          echo "Cargo git: $(du -sh ~/.cargo/git | cut -f1)"
+          echo "Target dir: $(du -sh target | cut -f1)"
 
       - name: Run doc tests
         run: cargo test --doc
@@ -80,7 +109,17 @@ jobs:
         with:
           components: clippy
 
-      - uses: Swatinem/rust-cache@v2
+      - name: Cache Rust dependencies
+        uses: useblacksmith/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-clippy-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-stable-
+            ${{ runner.os }}-cargo-
 
       - name: Run clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
@@ -95,7 +134,17 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - uses: Swatinem/rust-cache@v2
+      - name: Cache Rust dependencies
+        uses: useblacksmith/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-coverage-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-stable-
+            ${{ runner.os }}-cargo-
 
       - name: Install tarpaulin
         run: cargo install cargo-tarpaulin
@@ -120,7 +169,17 @@ jobs:
       - name: Install MSRV toolchain
         uses: dtolnay/rust-toolchain@1.70.0
 
-      - uses: Swatinem/rust-cache@v2
+      - name: Cache Rust dependencies
+        uses: useblacksmith/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-msrv-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-1.70.0-
+            ${{ runner.os }}-cargo-
 
       - name: Check MSRV
         run: cargo check --all-features
@@ -135,7 +194,17 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - uses: Swatinem/rust-cache@v2
+      - name: Cache Rust dependencies
+        uses: useblacksmith/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-build-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-stable-
+            ${{ runner.os }}-cargo-
 
       - name: Build
         run: cargo build --release --all-features
@@ -153,7 +222,17 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - uses: Swatinem/rust-cache@v2
+      - name: Cache Rust dependencies
+        uses: useblacksmith/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-integration-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-stable-
+            ${{ runner.os }}-cargo-
 
       - name: Run integration tests
         run: cargo integration

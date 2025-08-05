@@ -116,6 +116,7 @@ mod logical;
 mod result;
 mod suite;
 mod unified;
+pub mod validation_context;
 
 pub mod builder_extensions;
 
@@ -127,3 +128,4 @@ pub use logical::{ColumnSpec, ConstraintOptionsBuilder, LogicalOperator, Logical
 pub use result::{ValidationIssue, ValidationMetrics, ValidationReport, ValidationResult};
 pub use suite::{ValidationSuite, ValidationSuiteBuilder};
 pub use unified::{ConstraintOptions, UnifiedCompletenessBase, UnifiedConstraint};
+pub use validation_context::{current_validation_context, ValidationContext};

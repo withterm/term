@@ -8,6 +8,7 @@ use tracing::instrument;
 
 use crate::analyzers::{Analyzer, AnalyzerError, AnalyzerResult, AnalyzerState, MetricValue};
 
+use crate::core::current_validation_context;
 /// Analyzer that computes standard deviation and variance.
 ///
 /// This analyzer calculates both population and sample standard deviation,
@@ -161,13 +162,19 @@ impl Analyzer for StandardDeviationAnalyzer {
     #[instrument(skip(ctx), fields(analyzer = "standard_deviation", column = %self.column))]
     async fn compute_state_from_data(&self, ctx: &SessionContext) -> AnalyzerResult<Self::State> {
         // Build SQL query to compute statistics
+        // Get the table name from the validation context
+
+        let validation_ctx = current_validation_context();
+
+        let table_name = validation_ctx.table_name();
+
         let sql = format!(
             "SELECT 
                 COUNT({0}) as count,
                 AVG({0}) as mean,
                 SUM({0}) as sum,
                 SUM({0} * {0}) as sum_squared
-            FROM data 
+            FROM {table_name} 
             WHERE {0} IS NOT NULL",
             self.column
         );

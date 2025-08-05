@@ -1,12 +1,11 @@
 //! Type consistency validation constraints.
 
-use crate::core::{Constraint, ConstraintMetadata, ConstraintResult, ConstraintStatus};
+use crate::core::{current_validation_context, Constraint, ConstraintMetadata, ConstraintResult, ConstraintStatus};
 use crate::prelude::*;
 use arrow::array::Array;
 use async_trait::async_trait;
 use datafusion::prelude::*;
 use tracing::instrument;
-
 /// A constraint that checks for data type consistency in a column.
 ///
 /// Unlike `DataTypeConstraint` which checks for a specific expected type,
@@ -59,6 +58,10 @@ impl DataTypeConsistencyConstraint {
 impl Constraint for DataTypeConsistencyConstraint {
     #[instrument(skip(self, ctx), fields(column = %self.column, threshold = %self.threshold))]
     async fn evaluate(&self, ctx: &SessionContext) -> Result<ConstraintResult> {
+        // Get the table name from the validation context
+        let validation_ctx = current_validation_context();
+        let table_name = validation_ctx.table_name();
+        
         // First, get type distribution
         let type_dist_sql = format!(
             "WITH type_analysis AS (
@@ -72,7 +75,7 @@ impl Constraint for DataTypeConsistencyConstraint {
                         WHEN {} ~ '^\\d{{4}}-\\d{{2}}-\\d{{2}}[ T]\\d{{2}}:\\d{{2}}:\\d{{2}}' THEN 'timestamp'
                         ELSE 'string'
                     END as detected_type
-                FROM data
+                FROM {table_name}
             )
             SELECT 
                 detected_type,
@@ -210,6 +213,7 @@ mod tests {
     use datafusion::datasource::MemTable;
     use std::sync::Arc;
 
+    use crate::test_helpers::evaluate_constraint_with_context;
     async fn create_test_context(values: Vec<Option<&str>>) -> SessionContext {
         let ctx = SessionContext::new();
 
@@ -235,7 +239,7 @@ mod tests {
 
         let constraint = DataTypeConsistencyConstraint::new("mixed_col", 0.95);
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(1.0)); // All integers
         assert!(result.message.as_ref().unwrap().contains("integer"));
@@ -253,7 +257,7 @@ mod tests {
 
         let constraint = DataTypeConsistencyConstraint::new("mixed_col", 0.8);
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert_eq!(result.metric, Some(0.25)); // Each type appears once
         assert!(result
@@ -275,7 +279,7 @@ mod tests {
 
         let constraint = DataTypeConsistencyConstraint::new("mixed_col", 0.7);
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(0.75)); // 3 out of 4 are integers
     }
@@ -287,7 +291,7 @@ mod tests {
 
         let constraint = DataTypeConsistencyConstraint::new("mixed_col", 0.95);
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(1.0)); // All non-null values are integers
         assert!(result.message.as_ref().unwrap().contains("null: 40.0%"));
@@ -305,7 +309,7 @@ mod tests {
 
         let constraint = DataTypeConsistencyConstraint::new("mixed_col", 0.7);
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(0.75)); // 3 out of 4 are dates
         assert!(result.message.as_ref().unwrap().contains("date"));

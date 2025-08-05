@@ -10,6 +10,7 @@ use crate::analyzers::{
     types::HistogramBucket, Analyzer, AnalyzerError, AnalyzerResult, AnalyzerState,
     MetricDistribution, MetricValue,
 };
+use crate::core::current_validation_context;
 
 /// Analyzer that computes histogram distributions for numeric columns.
 ///
@@ -175,6 +176,10 @@ impl Analyzer for HistogramAnalyzer {
 
     #[instrument(skip(ctx), fields(analyzer = "histogram", column = %self.column, buckets = %self.num_buckets))]
     async fn compute_state_from_data(&self, ctx: &SessionContext) -> AnalyzerResult<Self::State> {
+        // Get the table name from the validation context
+        let validation_ctx = current_validation_context();
+        let table_name = validation_ctx.table_name();
+
         // First, get min/max values to determine bucket boundaries
         let stats_sql = format!(
             "SELECT 
@@ -183,7 +188,7 @@ impl Analyzer for HistogramAnalyzer {
                 COUNT({0}) as count,
                 SUM({0}) as sum,
                 SUM({0} * {0}) as sum_squared
-            FROM data 
+            FROM {table_name} 
             WHERE {0} IS NOT NULL",
             self.column
         );
@@ -279,7 +284,7 @@ impl Analyzer for HistogramAnalyzer {
                     ELSE {}
                 END as bucket_num,
                 COUNT(*) as count
-            FROM data
+            FROM {table_name}
             WHERE {} IS NOT NULL
             GROUP BY bucket_num
             ORDER BY bucket_num",

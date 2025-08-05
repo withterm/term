@@ -7,7 +7,9 @@
 //!
 //! And adds support for more complex type validations.
 
-use crate::core::{Constraint, ConstraintMetadata, ConstraintResult, ConstraintStatus};
+use crate::core::{
+    current_validation_context, Constraint, ConstraintMetadata, ConstraintResult, ConstraintStatus,
+};
 use crate::prelude::*;
 use crate::security::SqlSecurity;
 use arrow::array::Array;
@@ -15,7 +17,6 @@ use async_trait::async_trait;
 use datafusion::prelude::*;
 use serde::{Deserialize, Serialize};
 use tracing::instrument;
-
 /// Types of data type validation that can be performed.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum DataTypeValidation {
@@ -293,10 +294,14 @@ impl Constraint for DataTypeConstraint {
         validation = ?self.validation
     ))]
     async fn evaluate(&self, ctx: &SessionContext) -> Result<ConstraintResult> {
+        // Get the table name from the validation context
+        let validation_ctx = current_validation_context();
+        let table_name = validation_ctx.table_name();
+
         match &self.validation {
             DataTypeValidation::SpecificType(expected_type) => {
                 // Check the schema for the column type
-                let df = ctx.table("data").await?;
+                let df = ctx.table(table_name).await?;
                 let schema = df.schema();
 
                 let field = schema.field_with_name(None, &self.column).map_err(|_| {
@@ -334,7 +339,7 @@ impl Constraint for DataTypeConstraint {
 
                 // For now, just check that the column exists and return a placeholder result
                 let sql = format!(
-                    "SELECT COUNT(*) as total FROM data WHERE {} IS NOT NULL",
+                    "SELECT COUNT(*) as total FROM {table_name} WHERE {} IS NOT NULL",
                     SqlSecurity::escape_identifier(&self.column)?
                 );
 
@@ -382,7 +387,7 @@ impl Constraint for DataTypeConstraint {
                     "SELECT 
                         COUNT(*) as total,
                         SUM(CASE WHEN {predicate} THEN 1 ELSE 0 END) as valid
-                     FROM data
+                     FROM {table_name}
                      WHERE {} IS NOT NULL",
                     SqlSecurity::escape_identifier(&self.column)?
                 );
@@ -457,6 +462,7 @@ mod tests {
     use datafusion::datasource::MemTable;
     use std::sync::Arc;
 
+    use crate::test_helpers::evaluate_constraint_with_context;
     async fn create_test_context(batch: RecordBatch) -> SessionContext {
         let ctx = SessionContext::new();
         let provider = MemTable::try_new(batch.schema(), vec![vec![batch]]).unwrap();
@@ -484,12 +490,16 @@ mod tests {
 
         // Test correct type
         let constraint = DataTypeConstraint::specific_type("int_col", "Int64").unwrap();
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
 
         // Test incorrect type
         let constraint = DataTypeConstraint::specific_type("int_col", "Utf8").unwrap();
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
     }
 
@@ -525,12 +535,16 @@ mod tests {
 
         // Test all non-negative values
         let constraint = DataTypeConstraint::non_negative("positive_values").unwrap();
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
 
         // Test mixed values
         let constraint = DataTypeConstraint::non_negative("mixed_values").unwrap();
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert!(result.metric.unwrap() < 1.0);
     }
@@ -566,7 +580,9 @@ mod tests {
         )
         .unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
     }
 
@@ -598,7 +614,9 @@ mod tests {
         )
         .unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
         // 3 out of 4 non-null values are not empty (empty string counts as empty)
         assert!((result.metric.unwrap() - 0.75).abs() < 0.01);

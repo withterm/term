@@ -7,6 +7,7 @@ use tracing::instrument;
 
 use crate::analyzers::{Analyzer, AnalyzerError, AnalyzerResult, AnalyzerState, MetricValue};
 
+use crate::core::current_validation_context;
 /// Analyzer that computes the sum of values in a numeric column.
 ///
 /// # Example
@@ -79,8 +80,14 @@ impl Analyzer for SumAnalyzer {
     #[instrument(skip(ctx), fields(analyzer = "sum", column = %self.column))]
     async fn compute_state_from_data(&self, ctx: &SessionContext) -> AnalyzerResult<Self::State> {
         // Build SQL query to compute sum and check for non-null values
+        // Get the table name from the validation context
+
+        let validation_ctx = current_validation_context();
+
+        let table_name = validation_ctx.table_name();
+
         let sql = format!(
-            "SELECT SUM({0}) as sum, COUNT({0}) as count FROM data",
+            "SELECT SUM({0}) as sum, COUNT({0}) as count FROM {table_name}",
             self.column
         );
 
