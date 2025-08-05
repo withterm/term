@@ -7,6 +7,7 @@ use tracing::instrument;
 
 use crate::analyzers::{Analyzer, AnalyzerError, AnalyzerResult, AnalyzerState, MetricValue};
 
+use crate::core::current_validation_context;
 /// Shared state for min/max analyzers.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MinMaxState {
@@ -86,8 +87,16 @@ impl Analyzer for MinAnalyzer {
     #[instrument(skip(ctx), fields(analyzer = "min", column = %self.column))]
     async fn compute_state_from_data(&self, ctx: &SessionContext) -> AnalyzerResult<Self::State> {
         // Build SQL query to compute min
+        // Get the table name from the validation context
+
+        let validation_ctx = current_validation_context();
+
+        let table_name = validation_ctx.table_name();
+
+        
+
         let sql = format!(
-            "SELECT MIN({0}) as min, MAX({0}) as max FROM data",
+            "SELECT MIN({0}) as min, MAX({0}) as max FROM {table_name}",
             self.column
         );
 
@@ -230,9 +239,13 @@ impl Analyzer for MaxAnalyzer {
 
     #[instrument(skip(ctx), fields(analyzer = "max", column = %self.column))]
     async fn compute_state_from_data(&self, ctx: &SessionContext) -> AnalyzerResult<Self::State> {
+        // Get the table name from the validation context
+        let validation_ctx = current_validation_context();
+        let table_name = validation_ctx.table_name();
+        
         // Build SQL query to compute max (we compute both for efficiency)
         let sql = format!(
-            "SELECT MIN({0}) as min, MAX({0}) as max FROM data",
+            "SELECT MIN({0}) as min, MAX({0}) as max FROM {table_name}",
             self.column
         );
 

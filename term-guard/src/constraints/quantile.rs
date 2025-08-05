@@ -7,7 +7,7 @@
 //! And adds support for multiple quantile checks and distribution analysis.
 
 use crate::constraints::Assertion;
-use crate::core::{Constraint, ConstraintMetadata, ConstraintResult};
+use crate::core::{current_validation_context, Constraint, ConstraintMetadata, ConstraintResult};
 use crate::prelude::*;
 use crate::security::SqlSecurity;
 use arrow::array::Array;
@@ -16,7 +16,6 @@ use datafusion::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::{debug, instrument};
-
 /// Types of quantile calculations.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum QuantileMethod {
@@ -247,8 +246,12 @@ impl QuantileConstraint {
             QuantileMethod::Exact => Ok(true),
             QuantileMethod::Approximate => Ok(false),
             QuantileMethod::Auto { threshold } => {
-                let count_sql = "SELECT COUNT(*) as cnt FROM data";
-                let df = ctx.sql(count_sql).await?;
+                // Get the table name from the validation context
+                let validation_ctx = current_validation_context();
+                let table_name = validation_ctx.table_name();
+                
+                let count_sql = format!("SELECT COUNT(*) as cnt FROM {table_name}");
+                let df = ctx.sql(&count_sql).await?;
                 let batches = df.collect().await?;
 
                 if batches.is_empty() || batches[0].num_rows() == 0 {
@@ -282,8 +285,16 @@ impl Constraint for QuantileConstraint {
         match &self.validation {
             QuantileValidation::Single(check) => {
                 // Always use approx for now since DataFusion doesn't support exact percentile_cont
+                // Get the table name from the validation context
+
+                let validation_ctx = current_validation_context();
+
+                let table_name = validation_ctx.table_name();
+
+                
+
                 let sql = format!(
-                    "SELECT {} as q_value FROM data",
+                    "SELECT {} as q_value FROM {table_name}",
                     self.approx_quantile_sql(check.quantile)?
                 );
 
@@ -339,7 +350,11 @@ impl Constraint for QuantileConstraint {
                     .collect::<Result<Vec<_>>>()?;
 
                 let parts = sql_parts.join(", ");
-                let sql = format!("SELECT {parts} FROM data");
+                // Get the table name from the validation context
+                let validation_ctx = current_validation_context();
+                let table_name = validation_ctx.table_name();
+                
+                let sql = format!("SELECT {parts} FROM {table_name}");
                 let df = ctx.sql(&sql).await?;
                 let batches = df.collect().await?;
 
@@ -399,7 +414,11 @@ impl Constraint for QuantileConstraint {
                     .collect::<Result<Vec<_>>>()?;
 
                 let parts = sql_parts.join(", ");
-                let sql = format!("SELECT {parts} FROM data");
+                // Get the table name from the validation context
+                let validation_ctx = current_validation_context();
+                let table_name = validation_ctx.table_name();
+                
+                let sql = format!("SELECT {parts} FROM {table_name}");
                 let df = ctx.sql(&sql).await?;
                 let batches = df.collect().await?;
 
@@ -487,6 +506,7 @@ mod tests {
     use datafusion::datasource::MemTable;
     use std::sync::Arc;
 
+    use crate::test_helpers::evaluate_constraint_with_context;
     async fn create_test_context(values: Vec<Option<f64>>) -> SessionContext {
         let ctx = SessionContext::new();
 
@@ -513,7 +533,7 @@ mod tests {
         let constraint =
             QuantileConstraint::median("value", Assertion::Between(45.0, 55.0)).unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
     }
 
@@ -525,7 +545,7 @@ mod tests {
         let constraint =
             QuantileConstraint::percentile("value", 0.95, Assertion::Between(94.0, 96.0)).unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
     }
 
@@ -543,7 +563,7 @@ mod tests {
         )
         .unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
     }
 
@@ -561,7 +581,7 @@ mod tests {
         )
         .unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
     }
 

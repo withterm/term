@@ -1,6 +1,6 @@
 //! Custom SQL validation constraints.
 
-use crate::core::{Constraint, ConstraintMetadata, ConstraintResult};
+use crate::core::{current_validation_context, Constraint, ConstraintMetadata, ConstraintResult};
 use crate::prelude::*;
 use crate::security::SqlSecurity;
 use async_trait::async_trait;
@@ -10,7 +10,6 @@ use regex::Regex;
 use std::collections::{HashMap, HashSet};
 use std::sync::RwLock;
 use tracing::instrument;
-
 /// Cache for compiled regex patterns to avoid recompiling
 static REGEX_CACHE: Lazy<RwLock<HashMap<String, Regex>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
@@ -195,11 +194,19 @@ impl Constraint for CustomSqlConstraint {
     #[instrument(skip(self, ctx), fields(expression = %self.expression))]
     async fn evaluate(&self, ctx: &SessionContext) -> Result<ConstraintResult> {
         // Wrap the expression in a query that counts rows where the condition is true
+        // Get the table name from the validation context
+
+        let validation_ctx = current_validation_context();
+
+        let table_name = validation_ctx.table_name();
+
+        
+
         let sql = format!(
             "SELECT 
                 COUNT(CASE WHEN {} THEN 1 END) as satisfied,
                 COUNT(*) as total
-             FROM data",
+             FROM {table_name}",
             self.expression
         );
 
@@ -307,6 +314,7 @@ mod tests {
     use datafusion::datasource::MemTable;
     use std::sync::Arc;
 
+    use crate::test_helpers::evaluate_constraint_with_context;
     async fn create_test_context() -> SessionContext {
         let ctx = SessionContext::new();
 
@@ -357,7 +365,7 @@ mod tests {
     fn test_sql_validation_rejects_dangerous_operations() {
         // These should all be rejected
         assert!(validate_sql_expression("DROP TABLE users").is_err());
-        assert!(validate_sql_expression("DELETE FROM data WHERE 1=1").is_err());
+        assert!(validate_sql_expression("DELETE FROM {table_name} WHERE 1=1").is_err());
         assert!(validate_sql_expression("UPDATE data SET price = 0").is_err());
         assert!(validate_sql_expression("price > 0; DROP TABLE data").is_err());
         assert!(validate_sql_expression("INSERT INTO data VALUES (1, 2, 3)").is_err());
@@ -372,7 +380,7 @@ mod tests {
     fn test_sql_validation_case_insensitive() {
         // Should reject regardless of case
         assert!(validate_sql_expression("drop table users").is_err());
-        assert!(validate_sql_expression("DeLeTe FROM data").is_err());
+        assert!(validate_sql_expression("DeLeTe FROM {table_name}").is_err());
         assert!(validate_sql_expression("UpDaTe data SET x = 1").is_err());
     }
 
@@ -390,7 +398,7 @@ mod tests {
 
         let constraint = CustomSqlConstraint::new("price > 0", None::<String>).unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert_eq!(result.metric, Some(0.8)); // 4 out of 5 rows satisfy (NULL doesn't satisfy)
     }
@@ -402,7 +410,7 @@ mod tests {
         // Using quantity > -1 will be true for all rows (all quantities are >= 0)
         let constraint = CustomSqlConstraint::new("quantity >= 0", None::<String>).unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(1.0)); // All rows satisfy
     }
@@ -414,7 +422,7 @@ mod tests {
         let constraint =
             CustomSqlConstraint::new("quantity > 0", Some("Quantity must be positive")).unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert_eq!(result.metric, Some(0.8)); // 4 out of 5 have quantity > 0
         assert!(result
@@ -435,7 +443,7 @@ mod tests {
         )
         .unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
         // Only 3 rows have status='active' AND price >= 10
         assert_eq!(result.metric, Some(0.6));
@@ -447,7 +455,7 @@ mod tests {
 
         let constraint = CustomSqlConstraint::new("price IS NOT NULL", None::<String>).unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert_eq!(result.metric, Some(0.8)); // 4 out of 5 have non-null price
     }
@@ -458,7 +466,7 @@ mod tests {
 
         let constraint = CustomSqlConstraint::new("invalid_column > 0", None::<String>).unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert!(result
             .message
@@ -479,7 +487,7 @@ mod tests {
 
     #[test]
     fn test_try_new_returns_error_on_dangerous_sql() {
-        let result = CustomSqlConstraint::try_new("DELETE FROM data", None::<String>);
+        let result = CustomSqlConstraint::try_new("DELETE FROM {table_name}", None::<String>);
         assert!(result.is_err());
         assert!(result
             .unwrap_err()

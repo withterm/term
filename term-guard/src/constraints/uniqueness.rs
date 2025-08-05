@@ -4,7 +4,7 @@
 //! validations including full uniqueness, distinctness, unique value ratios, and primary keys.
 
 use crate::constraints::Assertion;
-use crate::core::{Constraint, ConstraintMetadata, ConstraintResult};
+use crate::core::{current_validation_context, Constraint, ConstraintMetadata, ConstraintResult};
 use crate::prelude::*;
 use crate::security::SqlSecurity;
 use arrow::array::Array;
@@ -12,7 +12,6 @@ use async_trait::async_trait;
 use datafusion::prelude::*;
 use std::fmt;
 use tracing::instrument;
-
 /// Null handling strategy for uniqueness constraints.
 ///
 /// Defines how NULL values should be treated when evaluating uniqueness.
@@ -448,8 +447,12 @@ impl Constraint for UniquenessConstraint {
         null_handling = %self.options.null_handling
     ))]
     async fn evaluate(&self, ctx: &SessionContext) -> Result<ConstraintResult> {
+        // Get the table name from the validation context
+        let validation_ctx = current_validation_context();
+        let table_name = validation_ctx.table_name();
+        
         // Generate SQL based on uniqueness type
-        let sql = self.generate_sql()?;
+        let sql = self.generate_sql(&table_name)?;
 
         let df = ctx.sql(&sql).await?;
         let batches = df.collect().await?;
@@ -529,19 +532,19 @@ impl Constraint for UniquenessConstraint {
 
 impl UniquenessConstraint {
     /// Generates SQL query based on the uniqueness type and options.
-    fn generate_sql(&self) -> Result<String> {
+    fn generate_sql(&self, table_name: &str) -> Result<String> {
         match &self.uniqueness_type {
             UniquenessType::FullUniqueness { .. }
             | UniquenessType::UniqueWithNulls { .. }
-            | UniquenessType::UniqueComposite { .. } => self.generate_full_uniqueness_sql(),
-            UniquenessType::Distinctness(_) => self.generate_distinctness_sql(),
-            UniquenessType::UniqueValueRatio(_) => self.generate_unique_value_ratio_sql(),
-            UniquenessType::PrimaryKey => self.generate_primary_key_sql(),
+            | UniquenessType::UniqueComposite { .. } => self.generate_full_uniqueness_sql(table_name),
+            UniquenessType::Distinctness(_) => self.generate_distinctness_sql(table_name),
+            UniquenessType::UniqueValueRatio(_) => self.generate_unique_value_ratio_sql(table_name),
+            UniquenessType::PrimaryKey => self.generate_primary_key_sql(table_name),
         }
     }
 
     /// Generates SQL for full uniqueness validation.
-    fn generate_full_uniqueness_sql(&self) -> Result<String> {
+    fn generate_full_uniqueness_sql(&self, table_name: &str) -> Result<String> {
         let escaped_columns: Result<Vec<String>> = self
             .columns
             .iter()
@@ -568,14 +571,14 @@ impl UniquenessConstraint {
                         "SELECT 
                             COUNT(*) as total_count,
                             COUNT(DISTINCT COALESCE({col}, '<NULL>')) as unique_count
-                         FROM data"
+                         FROM {table_name}"
                     )
                 } else {
                     format!(
                         "SELECT 
                             COUNT(*) as total_count,
                             COUNT(DISTINCT {columns_expr}) as unique_count
-                         FROM data"
+                         FROM {table_name}"
                     )
                 }
             }
@@ -590,7 +593,7 @@ impl UniquenessConstraint {
                         "SELECT 
                             COUNT(*) as total_count,
                             COUNT(DISTINCT {col}) + CASE WHEN COUNT(*) - COUNT({col}) > 0 THEN COUNT(*) - COUNT({col}) ELSE 0 END as unique_count
-                         FROM data"
+                         FROM {table_name}"
                     )
                 } else {
                     // For multi-column, this is more complex - treat as regular for now
@@ -598,7 +601,7 @@ impl UniquenessConstraint {
                         "SELECT 
                             COUNT(*) as total_count,
                             COUNT(DISTINCT {columns_expr}) as unique_count
-                         FROM data"
+                         FROM {table_name}"
                     )
                 }
             }
@@ -608,7 +611,7 @@ impl UniquenessConstraint {
                     "SELECT 
                         COUNT(*) as total_count,
                         COUNT(DISTINCT {columns_expr}) as unique_count
-                     FROM data"
+                     FROM {table_name}"
                 )
             }
         };
@@ -617,7 +620,7 @@ impl UniquenessConstraint {
     }
 
     /// Generates SQL for distinctness validation.
-    fn generate_distinctness_sql(&self) -> Result<String> {
+    fn generate_distinctness_sql(&self, table_name: &str) -> Result<String> {
         let escaped_columns: Result<Vec<String>> = self
             .columns
             .iter()
@@ -631,7 +634,7 @@ impl UniquenessConstraint {
                 "SELECT 
                     COUNT(DISTINCT {col}) as distinct_count,
                     COUNT(*) as total_count
-                 FROM data"
+                 FROM {table_name}"
             )
         } else {
             // Multi-column distinctness using concatenation with NULL handling
@@ -645,7 +648,7 @@ impl UniquenessConstraint {
                 "SELECT 
                     COUNT(DISTINCT ({concat_expr})) as distinct_count,
                     COUNT(*) as total_count
-                 FROM data"
+                 FROM {table_name}"
             )
         };
 
@@ -653,7 +656,7 @@ impl UniquenessConstraint {
     }
 
     /// Generates SQL for unique value ratio validation.
-    fn generate_unique_value_ratio_sql(&self) -> Result<String> {
+    fn generate_unique_value_ratio_sql(&self, table_name: &str) -> Result<String> {
         let escaped_columns: Result<Vec<String>> = self
             .columns
             .iter()
@@ -666,7 +669,7 @@ impl UniquenessConstraint {
         let sql = format!(
             "WITH value_counts AS (
                 SELECT {columns_list}, COUNT(*) as cnt
-                FROM data
+                FROM {table_name}
                 GROUP BY {columns_list}
             )
             SELECT 
@@ -679,7 +682,7 @@ impl UniquenessConstraint {
     }
 
     /// Generates SQL for primary key validation.
-    fn generate_primary_key_sql(&self) -> Result<String> {
+    fn generate_primary_key_sql(&self, table_name: &str) -> Result<String> {
         let escaped_columns: Result<Vec<String>> = self
             .columns
             .iter()
@@ -706,7 +709,7 @@ impl UniquenessConstraint {
                 COUNT(*) as total_count,
                 COUNT(DISTINCT {columns_expr}) as unique_count,
                 COUNT(*) - COUNT(CASE WHEN {null_check} THEN 1 END) as null_count
-             FROM data"
+             FROM {table_name}"
         );
 
         Ok(sql)
@@ -858,6 +861,7 @@ mod tests {
     use datafusion::datasource::MemTable;
     use std::sync::Arc;
 
+    use crate::test_helpers::evaluate_constraint_with_context;
     async fn create_test_context(values: Vec<Option<&str>>) -> SessionContext {
         let ctx = SessionContext::new();
 
@@ -905,7 +909,7 @@ mod tests {
 
         let constraint = UniquenessConstraint::full_uniqueness("test_col", 0.7).unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(0.75)); // 3 unique out of 4 total
     }
@@ -918,7 +922,7 @@ mod tests {
         // Standard uniqueness (excludes NULLs from distinct count)
         let constraint = UniquenessConstraint::full_uniqueness("test_col", 0.4).unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(0.5)); // 2 unique non-null out of 4 total
     }
@@ -931,7 +935,7 @@ mod tests {
         let constraint =
             UniquenessConstraint::distinctness(vec!["test_col"], Assertion::Equals(0.75)).unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(0.75)); // 3 distinct out of 4 total
     }
@@ -945,7 +949,7 @@ mod tests {
             UniquenessConstraint::unique_value_ratio(vec!["test_col"], Assertion::Equals(0.5))
                 .unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(0.5)); // 2 values appear exactly once out of 4 total
     }
@@ -957,7 +961,7 @@ mod tests {
 
         let constraint = UniquenessConstraint::primary_key(vec!["test_col"]).unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(1.0));
     }
@@ -969,7 +973,7 @@ mod tests {
 
         let constraint = UniquenessConstraint::primary_key(vec!["test_col"]).unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert!(result.message.unwrap().contains("NULL values"));
     }
@@ -981,7 +985,7 @@ mod tests {
 
         let constraint = UniquenessConstraint::primary_key(vec!["test_col"]).unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert!(result.message.unwrap().contains("duplicate values"));
     }
@@ -995,7 +999,7 @@ mod tests {
         let constraint =
             UniquenessConstraint::full_uniqueness_multi(vec!["col1", "col2"], 0.9).unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(1.0)); // All combinations are unique
     }
@@ -1010,7 +1014,7 @@ mod tests {
             UniquenessConstraint::distinctness(vec!["col1", "col2"], Assertion::GreaterThan(0.5))
                 .unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         // Two distinct combinations: A|1 and B|2, plus A|1 repeated = 2/3 = 0.67
         assert!((result.metric.unwrap() - 2.0 / 3.0).abs() < 0.01);
@@ -1025,7 +1029,7 @@ mod tests {
             UniquenessConstraint::unique_with_nulls(vec!["test_col"], 0.4, NullHandling::Include)
                 .unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(0.75)); // A, B, NULL (treated as one value) = 3/4
     }
@@ -1037,7 +1041,7 @@ mod tests {
 
         let constraint = UniquenessConstraint::full_uniqueness("test_col", 1.0).unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Skipped);
     }
 

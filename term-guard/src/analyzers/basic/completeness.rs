@@ -7,6 +7,7 @@ use tracing::instrument;
 
 use crate::analyzers::{Analyzer, AnalyzerError, AnalyzerResult, AnalyzerState, MetricValue};
 
+use crate::core::current_validation_context;
 /// Analyzer that computes the fraction of non-null values for a column.
 ///
 /// Completeness is a fundamental data quality metric that measures
@@ -96,8 +97,16 @@ impl Analyzer for CompletenessAnalyzer {
     #[instrument(skip(ctx), fields(analyzer = "completeness", column = %self.column))]
     async fn compute_state_from_data(&self, ctx: &SessionContext) -> AnalyzerResult<Self::State> {
         // Build SQL query to count total rows and non-null values
+        // Get the table name from the validation context
+
+        let validation_ctx = current_validation_context();
+
+        let table_name = validation_ctx.table_name();
+
+        
+
         let sql = format!(
-            "SELECT COUNT(*) as total_count, COUNT({}) as non_null_count FROM data",
+            "SELECT COUNT(*) as total_count, COUNT({}) as non_null_count FROM {table_name}",
             self.column
         );
 

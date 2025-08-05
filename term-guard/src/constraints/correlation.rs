@@ -7,7 +7,7 @@
 //! And adds support for other correlation types and multi-column relationships.
 
 use crate::constraints::Assertion;
-use crate::core::{Constraint, ConstraintMetadata, ConstraintResult};
+use crate::core::{current_validation_context, Constraint, ConstraintMetadata, ConstraintResult};
 use crate::prelude::*;
 use crate::security::SqlSecurity;
 use arrow::array::Array;
@@ -15,7 +15,6 @@ use async_trait::async_trait;
 use datafusion::prelude::*;
 use serde::{Deserialize, Serialize};
 use tracing::instrument;
-
 /// Types of correlation that can be computed.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum CorrelationType {
@@ -298,6 +297,10 @@ impl Constraint for CorrelationConstraint {
         validation = ?self.validation
     ))]
     async fn evaluate(&self, ctx: &SessionContext) -> Result<ConstraintResult> {
+        // Get the table name from the validation context
+        let validation_ctx = current_validation_context();
+        let table_name = validation_ctx.table_name();
+        
         match &self.validation {
             CorrelationValidation::Pairwise {
                 column1,
@@ -308,13 +311,13 @@ impl Constraint for CorrelationConstraint {
                 let sql = match correlation_type {
                     CorrelationType::Pearson => {
                         format!(
-                            "SELECT {} as corr_value FROM data",
+                            "SELECT {} as corr_value FROM {table_name}",
                             self.pearson_sql(column1, column2)?
                         )
                     }
                     CorrelationType::Covariance => {
                         format!(
-                            "SELECT {} as corr_value FROM data",
+                            "SELECT {} as corr_value FROM {table_name}",
                             self.covariance_sql(column1, column2)?
                         )
                     }
@@ -332,7 +335,7 @@ impl Constraint for CorrelationConstraint {
                         let expr = sql_expression
                             .replace("{column1}", &escaped_col1)
                             .replace("{column2}", &escaped_col2);
-                        format!("SELECT {expr} as corr_value FROM data")
+                        format!("SELECT {expr} as corr_value FROM {table_name}")
                     }
                     _ => {
                         // Other correlation types would require more complex implementation
@@ -396,8 +399,16 @@ impl Constraint for CorrelationConstraint {
                 column2,
                 max_correlation,
             } => {
+                // Get the table name from the validation context
+
+                let validation_ctx = current_validation_context();
+
+                let table_name = validation_ctx.table_name();
+
+                
+
                 let sql = format!(
-                    "SELECT ABS({}) as abs_corr FROM data",
+                    "SELECT ABS({}) as abs_corr FROM {table_name}",
                     self.pearson_sql(column1, column2)?
                 );
 
@@ -507,6 +518,7 @@ mod tests {
     use datafusion::datasource::MemTable;
     use std::sync::Arc;
 
+    use crate::test_helpers::evaluate_constraint_with_context;
     async fn create_test_context_correlated() -> SessionContext {
         let ctx = SessionContext::new();
 
@@ -580,7 +592,7 @@ mod tests {
         let constraint =
             CorrelationConstraint::pearson("x", "y", Assertion::GreaterThan(0.9)).unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert!(result.metric.unwrap() > 0.9);
     }
@@ -591,7 +603,7 @@ mod tests {
 
         let constraint = CorrelationConstraint::independence("x", "y", 0.3).unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         // Independent data should have low correlation
         assert_eq!(result.status, ConstraintStatus::Success);
     }
@@ -609,7 +621,7 @@ mod tests {
         })
         .unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
     }
 

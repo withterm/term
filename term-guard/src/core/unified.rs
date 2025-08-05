@@ -4,6 +4,7 @@
 //! including base traits, common options, and shared functionality.
 
 use super::{ColumnSpec, Constraint, ConstraintResult, LogicalOperator};
+use crate::core::current_validation_context;
 use crate::prelude::*;
 use async_trait::async_trait;
 use datafusion::prelude::*;
@@ -245,11 +246,19 @@ impl UnifiedCompletenessBase {
         ctx: &SessionContext,
         column: &str,
     ) -> Result<(f64, i64, i64)> {
+        // Get the table name from the validation context
+
+        let validation_ctx = current_validation_context();
+
+        let table_name = validation_ctx.table_name();
+
+        
+
         let sql = format!(
             "SELECT 
                 COUNT(*) as total_count,
                 COUNT({column}) as non_null_count
-             FROM data"
+             FROM {table_name}"
         );
 
         let df = ctx.sql(&sql).await?;

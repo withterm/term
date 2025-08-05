@@ -7,6 +7,7 @@ use tracing::instrument;
 
 use crate::analyzers::{Analyzer, AnalyzerError, AnalyzerResult, AnalyzerState, MetricValue};
 
+use crate::core::current_validation_context;
 /// Analyzer that evaluates compliance with custom SQL expressions.
 ///
 /// This analyzer allows users to define custom data quality rules using SQL expressions.
@@ -143,11 +144,19 @@ impl Analyzer for ComplianceAnalyzer {
         self.validate_predicate()?;
 
         // Build SQL query with the predicate
+        // Get the table name from the validation context
+
+        let validation_ctx = current_validation_context();
+
+        let table_name = validation_ctx.table_name();
+
+        
+
         let sql = format!(
             "SELECT 
                 COUNT(CASE WHEN ({}) THEN 1 END) as compliant_count,
                 COUNT(*) as total_count
-            FROM data",
+            FROM {table_name}",
             self.predicate
         );
 

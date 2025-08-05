@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use tracing::instrument;
 
 use crate::analyzers::{Analyzer, AnalyzerResult, AnalyzerState, MetricValue};
+use crate::core::current_validation_context;
 
 /// Analyzer that computes the number of rows in a dataset.
 ///
@@ -73,8 +74,13 @@ impl Analyzer for SizeAnalyzer {
 
     #[instrument(skip(ctx), fields(analyzer = "size"))]
     async fn compute_state_from_data(&self, ctx: &SessionContext) -> AnalyzerResult<Self::State> {
+        // Get the table name from the validation context
+        let validation_ctx = current_validation_context();
+        let table_name = validation_ctx.table_name();
+        
         // Execute count query
-        let df = ctx.sql("SELECT COUNT(*) as count FROM data").await?;
+        let sql = format!("SELECT COUNT(*) as count FROM {table_name}");
+        let df = ctx.sql(&sql).await?;
         let batches = df.collect().await?;
 
         // Extract count from result

@@ -22,12 +22,12 @@ version = "0.0.1"
 
 [features]
 default = []
-# Database features temporarily disabled until datafusion-table-providers is on crates.io
-# database = ["dep:datafusion-table-providers"]
-# postgres = ["database", "datafusion-table-providers/postgres"]
-# mysql = ["database", "datafusion-table-providers/mysql"]
-# sqlite = ["database", "datafusion-table-providers/sqlite"]
-# all-databases = ["postgres", "mysql", "sqlite"]
+# Database features
+database = ["dep:datafusion-table-providers"]
+postgres = ["database", "datafusion-table-providers/postgres"]
+mysql = ["database", "datafusion-table-providers/mysql"]
+sqlite = ["database", "datafusion-table-providers/sqlite"]
+all-databases = ["postgres", "mysql", "sqlite"]
 all-cloud = ["s3", "gcs", "azure"]
 azure = ["cloud-storage", "object_store/azure"]
 cloud-storage = ["dep:object_store", "dep:url"]
@@ -43,7 +43,7 @@ bincode = "1.3"
 chrono = {version = "0.4", features = ["serde"]}
 datafusion = "48.0.1"
 futures = "0.3"
-# datafusion-table-providers = { git = "https://github.com/datafusion-contrib/datafusion-table-providers.git", branch = "main", optional = true }
+datafusion-table-providers = { git = "https://github.com/datafusion-contrib/datafusion-table-providers.git", branch = "main", optional = true }
 # TODO: Replace with crates.io version when available
 glob = "0.3"
 object_store = {version = "0.12", optional = true}

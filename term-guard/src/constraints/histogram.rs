@@ -1,6 +1,6 @@
 //! Histogram analysis constraint for value distribution analysis.
 
-use crate::core::{Constraint, ConstraintMetadata, ConstraintResult, ConstraintStatus};
+use crate::core::{current_validation_context, Constraint, ConstraintMetadata, ConstraintResult, ConstraintStatus};
 use crate::prelude::*;
 use arrow::array::{Array, LargeStringArray, StringViewArray};
 use async_trait::async_trait;
@@ -8,7 +8,6 @@ use datafusion::prelude::*;
 use std::fmt;
 use std::sync::Arc;
 use tracing::instrument;
-
 /// A bucket in a histogram representing a value and its frequency information.
 #[derive(Debug, Clone, PartialEq)]
 pub struct HistogramBucket {
@@ -205,6 +204,10 @@ impl HistogramConstraint {
 impl Constraint for HistogramConstraint {
     #[instrument(skip(self, ctx), fields(column = %self.column))]
     async fn evaluate(&self, ctx: &SessionContext) -> Result<ConstraintResult> {
+        // Get the table name from the validation context
+        let validation_ctx = current_validation_context();
+        let table_name = validation_ctx.table_name();
+        
         // SQL query to compute value frequencies
         let sql = format!(
             r#"
@@ -212,7 +215,7 @@ impl Constraint for HistogramConstraint {
                 SELECT 
                     CAST({} AS VARCHAR) as value,
                     COUNT(*) as count
-                FROM data
+                FROM {table_name}
                 WHERE {} IS NOT NULL
                 GROUP BY {}
             ),
@@ -220,7 +223,7 @@ impl Constraint for HistogramConstraint {
                 SELECT 
                     COUNT(*) as total_cnt,
                     SUM(CASE WHEN {} IS NULL THEN 1 ELSE 0 END) as null_cnt
-                FROM data
+                FROM {table_name}
             )
             SELECT 
                 vc.value,
@@ -414,6 +417,7 @@ mod tests {
     use datafusion::datasource::MemTable;
     use std::sync::Arc;
 
+    use crate::test_helpers::evaluate_constraint_with_context;
     async fn create_test_context_with_data(values: Vec<Option<&str>>) -> SessionContext {
         let ctx = SessionContext::new();
 
@@ -531,7 +535,7 @@ mod tests {
             "most common value appears less than 50%",
         );
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert!(result.message.is_some());
 
@@ -539,7 +543,7 @@ mod tests {
         let constraint =
             HistogramConstraint::new("test_col", Arc::new(|hist| hist.most_common_ratio() < 0.7));
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
     }
 
@@ -562,7 +566,7 @@ mod tests {
             "has between 3 and 5 distinct values",
         );
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
     }
 
@@ -584,7 +588,7 @@ mod tests {
         let constraint =
             HistogramConstraint::new("test_col", Arc::new(|hist| hist.is_roughly_uniform(1.5)));
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
     }
 
@@ -611,7 +615,7 @@ mod tests {
             "top 2 values account for 70% of distribution",
         );
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
     }
 
@@ -634,7 +638,7 @@ mod tests {
             Arc::new(|hist| hist.null_ratio() > 0.3 && hist.null_ratio() < 0.4),
         );
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
     }
 
@@ -644,7 +648,7 @@ mod tests {
 
         let constraint = HistogramConstraint::new("test_col", Arc::new(|_| true));
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Skipped);
     }
 
@@ -669,7 +673,7 @@ mod tests {
             "APPROVED status is most common",
         );
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
     }
 
@@ -697,7 +701,7 @@ mod tests {
             }),
         );
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
     }
 
@@ -737,7 +741,7 @@ mod tests {
             "age distribution is reasonable",
         );
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
     }
 }

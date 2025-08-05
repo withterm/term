@@ -2,7 +2,6 @@
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
-
 /// An assertion that can be evaluated against a numeric value.
 ///
 /// Used by statistical constraints to define success criteria.
@@ -86,6 +85,7 @@ impl fmt::Display for Assertion {
 mod tests {
     use super::*;
 
+    use crate::test_helpers::evaluate_constraint_with_context;
     #[test]
     fn test_equals() {
         let assertion = Assertion::Equals(10.0);

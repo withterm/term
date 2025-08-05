@@ -7,6 +7,7 @@ use tracing::instrument;
 
 use crate::analyzers::{Analyzer, AnalyzerError, AnalyzerResult, AnalyzerState, MetricValue};
 
+use crate::core::current_validation_context;
 /// Analyzer that computes approximate count distinct using HyperLogLog.
 ///
 /// This analyzer provides memory-efficient cardinality estimation for high-cardinality
@@ -104,8 +105,16 @@ impl Analyzer for ApproxCountDistinctAnalyzer {
     #[instrument(skip(ctx), fields(analyzer = "approx_count_distinct", column = %self.column))]
     async fn compute_state_from_data(&self, ctx: &SessionContext) -> AnalyzerResult<Self::State> {
         // Build SQL query using APPROX_DISTINCT function
+        // Get the table name from the validation context
+
+        let validation_ctx = current_validation_context();
+
+        let table_name = validation_ctx.table_name();
+
+        
+
         let sql = format!(
-            "SELECT APPROX_DISTINCT({0}) as approx_distinct, COUNT({0}) as total FROM data",
+            "SELECT APPROX_DISTINCT({0}) as approx_distinct, COUNT({0}) as total FROM {table_name}",
             self.column
         );
 

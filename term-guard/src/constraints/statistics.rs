@@ -10,7 +10,7 @@
 //! And adds support for new statistics like variance, median, and percentiles.
 
 use crate::constraints::Assertion;
-use crate::core::{Constraint, ConstraintMetadata, ConstraintResult};
+use crate::core::{current_validation_context, Constraint, ConstraintMetadata, ConstraintResult};
 use crate::prelude::*;
 use crate::security::SqlSecurity;
 use arrow::array::Array;
@@ -19,7 +19,6 @@ use datafusion::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use tracing::instrument;
-
 /// Types of statistics that can be computed.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum StatisticType {
@@ -255,7 +254,15 @@ impl Constraint for StatisticalConstraint {
     async fn evaluate(&self, ctx: &SessionContext) -> Result<ConstraintResult> {
         let column_identifier = SqlSecurity::escape_identifier(&self.column)?;
         let stat_expr = self.statistic.sql_expression(&column_identifier);
-        let sql = format!("SELECT {stat_expr} as stat_value FROM data");
+        // Get the table name from the validation context
+
+        let validation_ctx = current_validation_context();
+
+        let table_name = validation_ctx.table_name();
+
+        
+
+        let sql = format!("SELECT {stat_expr} as stat_value FROM {table_name}");
 
         let df = ctx.sql(&sql).await?;
         let batches = df.collect().await?;
@@ -431,7 +438,11 @@ impl Constraint for MultiStatisticalConstraint {
             .collect();
 
         let parts = sql_parts.join(", ");
-        let sql = format!("SELECT {parts} FROM data");
+                // Get the table name from the validation context
+        let validation_ctx = current_validation_context();
+        let table_name = validation_ctx.table_name();
+
+let sql = format!("SELECT {parts} FROM {table_name}");
 
         let df = ctx.sql(&sql).await?;
         let batches = df.collect().await?;
@@ -532,6 +543,7 @@ mod tests {
     use datafusion::datasource::MemTable;
     use std::sync::Arc;
 
+    use crate::test_helpers::evaluate_constraint_with_context;
     async fn create_test_context(values: Vec<Option<f64>>) -> SessionContext {
         let ctx = SessionContext::new();
 
@@ -555,7 +567,7 @@ mod tests {
         let ctx = create_test_context(vec![Some(10.0), Some(20.0), Some(30.0)]).await;
         let constraint = StatisticalConstraint::mean("value", Assertion::Equals(20.0)).unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(20.0));
     }
@@ -565,12 +577,12 @@ mod tests {
         let ctx = create_test_context(vec![Some(5.0), Some(10.0), Some(15.0)]).await;
 
         let min_constraint = StatisticalConstraint::min("value", Assertion::Equals(5.0)).unwrap();
-        let result = min_constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&min_constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(5.0));
 
         let max_constraint = StatisticalConstraint::max("value", Assertion::Equals(15.0)).unwrap();
-        let result = max_constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&max_constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(15.0));
     }
@@ -580,7 +592,7 @@ mod tests {
         let ctx = create_test_context(vec![Some(10.0), Some(20.0), Some(30.0)]).await;
         let constraint = StatisticalConstraint::sum("value", Assertion::Equals(60.0)).unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(60.0));
     }
@@ -590,7 +602,7 @@ mod tests {
         let ctx = create_test_context(vec![Some(10.0), None, Some(20.0)]).await;
         let constraint = StatisticalConstraint::mean("value", Assertion::Equals(15.0)).unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(15.0));
     }
@@ -600,7 +612,7 @@ mod tests {
         let ctx = create_test_context(vec![None, None, None]).await;
         let constraint = StatisticalConstraint::mean("value", Assertion::Equals(0.0)).unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert!(result.message.unwrap().contains("null"));
     }
@@ -631,7 +643,7 @@ mod tests {
         )
         .unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
     }
 
@@ -648,7 +660,7 @@ mod tests {
         )
         .unwrap();
 
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert!(result.message.unwrap().contains("minimum is 10"));
     }

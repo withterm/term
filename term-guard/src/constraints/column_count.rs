@@ -6,7 +6,6 @@ use crate::prelude::*;
 use async_trait::async_trait;
 use datafusion::prelude::*;
 use tracing::instrument;
-
 /// A constraint that validates the number of columns in a dataset.
 ///
 /// This constraint checks if the column count of the dataset meets the specified assertion.
@@ -110,6 +109,7 @@ mod tests {
     use datafusion::datasource::MemTable;
     use std::sync::Arc;
 
+    use crate::test_helpers::evaluate_constraint_with_context;
     async fn create_test_context_with_columns(num_columns: usize) -> SessionContext {
         let ctx = SessionContext::new();
 
@@ -141,13 +141,13 @@ mod tests {
 
         // Test exact match
         let constraint = ColumnCountConstraint::new(Assertion::Equals(5.0));
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(5.0));
 
         // Test mismatch
         let constraint = ColumnCountConstraint::new(Assertion::Equals(10.0));
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert_eq!(result.metric, Some(5.0));
         assert!(result.message.is_some());
@@ -159,12 +159,12 @@ mod tests {
 
         // Test success case
         let constraint = ColumnCountConstraint::new(Assertion::GreaterThan(5.0));
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
 
         // Test failure case
         let constraint = ColumnCountConstraint::new(Assertion::GreaterThan(10.0));
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
     }
 
@@ -174,12 +174,12 @@ mod tests {
 
         // Test success case
         let constraint = ColumnCountConstraint::new(Assertion::LessThan(5.0));
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
 
         // Test failure case
         let constraint = ColumnCountConstraint::new(Assertion::LessThan(2.0));
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
     }
 
@@ -189,12 +189,12 @@ mod tests {
 
         // Test within range
         let constraint = ColumnCountConstraint::new(Assertion::Between(5.0, 10.0));
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
 
         // Test outside range
         let constraint = ColumnCountConstraint::new(Assertion::Between(10.0, 15.0));
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
     }
 
@@ -203,7 +203,7 @@ mod tests {
         let ctx = create_test_context_with_columns(1).await;
 
         let constraint = ColumnCountConstraint::new(Assertion::Equals(1.0));
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(1.0));
     }
@@ -213,7 +213,7 @@ mod tests {
         let ctx = create_test_context_with_columns(100).await;
 
         let constraint = ColumnCountConstraint::new(Assertion::GreaterThanOrEqual(100.0));
-        let result = constraint.evaluate(&ctx).await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(100.0));
     }
@@ -224,7 +224,7 @@ mod tests {
         // Don't register any table
 
         let constraint = ColumnCountConstraint::new(Assertion::Equals(5.0));
-        let result = constraint.evaluate(&ctx).await;
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await;
         assert!(result.is_err());
     }
 

@@ -9,6 +9,7 @@ use tracing::instrument;
 
 use crate::analyzers::{Analyzer, AnalyzerError, AnalyzerResult, AnalyzerState, MetricValue};
 
+use crate::core::current_validation_context;
 /// Analyzer that computes Shannon entropy and related information theory metrics.
 ///
 /// Entropy measures the average information content or uncertainty in a dataset.
@@ -195,9 +196,13 @@ impl Analyzer for EntropyAnalyzer {
 
     #[instrument(skip(ctx), fields(analyzer = "entropy", column = %self.column, max_unique = %self.max_unique_values))]
     async fn compute_state_from_data(&self, ctx: &SessionContext) -> AnalyzerResult<Self::State> {
+        // Get the table name from the validation context
+        let validation_ctx = current_validation_context();
+        let table_name = validation_ctx.table_name();
+        
         // First check if we have too many unique values
         let count_distinct_sql = format!(
-            "SELECT COUNT(DISTINCT {0}) as unique_count FROM data WHERE {0} IS NOT NULL",
+            "SELECT COUNT(DISTINCT {0}) as unique_count FROM {table_name} WHERE {0} IS NOT NULL",
             self.column
         );
 
@@ -224,11 +229,19 @@ impl Analyzer for EntropyAnalyzer {
         // If too many unique values, use sampling or approximation
         let (sql, truncated) = if unique_count > self.max_unique_values {
             // Sample top N most frequent values
+            // Get the table name from the validation context
+
+            let validation_ctx = current_validation_context();
+
+            let table_name = validation_ctx.table_name();
+
+            
+
             let sql = format!(
                 "SELECT 
                     CAST({0} AS VARCHAR) as value, 
                     COUNT(*) as count
-                FROM data
+                FROM {table_name}
                 WHERE {0} IS NOT NULL
                 GROUP BY CAST({0} AS VARCHAR)
                 ORDER BY count DESC
@@ -242,7 +255,7 @@ impl Analyzer for EntropyAnalyzer {
                 "SELECT 
                     CAST({0} AS VARCHAR) as value, 
                     COUNT(*) as count
-                FROM data
+                FROM {table_name}
                 WHERE {0} IS NOT NULL
                 GROUP BY CAST({0} AS VARCHAR)",
                 self.column
@@ -296,7 +309,7 @@ impl Analyzer for EntropyAnalyzer {
         // If truncated, we need to get the true total count
         if truncated {
             let total_sql = format!(
-                "SELECT COUNT({0}) as total FROM data WHERE {0} IS NOT NULL",
+                "SELECT COUNT({0}) as total FROM {table_name} WHERE {0} IS NOT NULL",
                 self.column
             );
             let total_df = ctx.sql(&total_sql).await?;

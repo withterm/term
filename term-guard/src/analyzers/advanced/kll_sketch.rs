@@ -6,7 +6,6 @@
 
 use std::cmp::Ordering;
 use std::f64;
-
 use crate::error::{Result, TermError};
 
 /// A compactor holds items and performs periodic compaction operations.
@@ -363,6 +362,7 @@ impl KllSketch {
 mod tests {
     use super::*;
 
+    use crate::test_helpers::evaluate_constraint_with_context;
     #[test]
     fn test_kll_sketch_basic() {
         let mut sketch = KllSketch::new(100);

@@ -7,6 +7,7 @@ use tracing::instrument;
 
 use crate::analyzers::{Analyzer, AnalyzerError, AnalyzerResult, AnalyzerState, MetricValue};
 
+use crate::core::current_validation_context;
 /// Analyzer that computes the fraction of distinct values for a column.
 ///
 /// Distinctness measures uniqueness in data and is useful for identifying
@@ -103,8 +104,16 @@ impl Analyzer for DistinctnessAnalyzer {
     #[instrument(skip(ctx), fields(analyzer = "distinctness", column = %self.column))]
     async fn compute_state_from_data(&self, ctx: &SessionContext) -> AnalyzerResult<Self::State> {
         // Build SQL query to count total non-null values and distinct values
+        // Get the table name from the validation context
+
+        let validation_ctx = current_validation_context();
+
+        let table_name = validation_ctx.table_name();
+
+        
+
         let sql = format!(
-            "SELECT COUNT({0}) as total_count, COUNT(DISTINCT {0}) as distinct_count FROM data",
+            "SELECT COUNT({0}) as total_count, COUNT(DISTINCT {0}) as distinct_count FROM {table_name}",
             self.column
         );
 
