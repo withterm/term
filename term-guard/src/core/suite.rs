@@ -94,13 +94,7 @@ impl ValidationSuite {
                 };
 
                 // Run constraint evaluation with the proper table context
-                let validation_ctx =
-                    match crate::core::ValidationContext::new(self.table_name.clone()) {
-                        Ok(ctx) => ctx,
-                        Err(e) => {
-                            return Err(e);
-                        }
-                    };
+                let validation_ctx = crate::core::ValidationContext::new(self.table_name.clone());
                 let result = crate::core::validation_context::CURRENT_CONTEXT
                     .scope(validation_ctx, constraint.evaluate(ctx))
                     .await;

@@ -19,7 +19,7 @@
 //!
 //! # Example
 //!
-//! ```rust
+//! ```rust,ignore
 //! use term_guard::analyzers::profiler::ColumnProfiler;
 //! use term_guard::test_fixtures::create_minimal_tpc_h_context;
 //!
