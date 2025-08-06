@@ -11,7 +11,7 @@ pub async fn evaluate_constraint_with_context(
     ctx: &SessionContext,
     table_name: &str,
 ) -> Result<ConstraintResult, Box<dyn std::error::Error>> {
-    let validation_ctx = ValidationContext::new(table_name.to_string())?;
+    let validation_ctx = ValidationContext::new(table_name.to_string());
 
     // Use the scope method to set the context for the duration of the evaluation
     let result = CURRENT_CONTEXT

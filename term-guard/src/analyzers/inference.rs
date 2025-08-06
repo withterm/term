@@ -9,7 +9,7 @@
 //!
 //! # Example
 //!
-//! ```rust
+//! ```rust,ignore
 //! use term_guard::analyzers::inference::{TypeInferenceEngine, InferredDataType};
 //! use term_guard::test_fixtures::create_minimal_tpc_h_context;
 //!

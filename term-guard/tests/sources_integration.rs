@@ -329,16 +329,13 @@ mod database_tests {
     #[cfg(feature = "database")]
     use term_guard::sources::{DatabaseConfig, DatabaseSource};
 
-    #[cfg(feature = "database")]
-    use term_guard::security::SecureString;
-
-    #[cfg(all(feature = "database", feature = "postgres"))]
+    #[cfg(feature = "postgres")]
     use term_guard::sources::PostgresSource;
 
-    #[cfg(all(feature = "database", feature = "mysql"))]
+    #[cfg(feature = "mysql")]
     use term_guard::sources::MySqlSource;
 
-    #[cfg(all(feature = "database", feature = "sqlite"))]
+    #[cfg(feature = "sqlite")]
     use term_guard::sources::SqliteSource;
 
     #[tokio::test]

@@ -189,14 +189,18 @@ mod assertion;
 mod column_count;
 mod completeness;
 mod correlation;
+mod cross_table_sum;
 mod custom_sql;
 mod datatype;
+mod foreign_key;
 mod format;
 mod histogram;
+mod join_coverage;
 mod length;
 mod quantile;
 mod size;
 mod statistics;
+mod temporal_ordering;
 mod uniqueness;
 mod values;
 
@@ -206,16 +210,20 @@ pub use assertion::Assertion;
 pub use column_count::ColumnCountConstraint;
 pub use completeness::CompletenessConstraint;
 pub use correlation::{CorrelationConstraint, CorrelationType};
+pub use cross_table_sum::CrossTableSumConstraint;
 pub use custom_sql::CustomSqlConstraint;
 pub use datatype::{
     DataTypeConstraint, DataTypeValidation, NumericValidation, StringTypeValidation,
     TemporalValidation,
 };
+pub use foreign_key::ForeignKeyConstraint;
 pub use format::{FormatConstraint, FormatOptions, FormatType};
 pub use histogram::{Histogram, HistogramAssertion, HistogramBucket, HistogramConstraint};
+pub use join_coverage::{CoverageType, JoinCoverageConstraint};
 pub use length::{LengthAssertion, LengthConstraint};
 pub use quantile::{QuantileConstraint, QuantileMethod};
 pub use size::SizeConstraint;
 pub use statistics::{MultiStatisticalConstraint, StatisticType, StatisticalConstraint};
+pub use temporal_ordering::{TemporalOrderingConstraint, TemporalValidationType};
 pub use uniqueness::{NullHandling, UniquenessConstraint, UniquenessOptions, UniquenessType};
 pub use values::ContainmentConstraint;

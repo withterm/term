@@ -195,7 +195,7 @@ Congratulations! You've learned how to:
 
 Now that you understand analyzers, you're ready to:
 
-1. **Continue Learning**: Try the [Data Validation with Checks](04-validation-with-checks.md) tutorial
+1. **Continue Learning**: Try the [Column Profiling](04-column-profiling.md) tutorial
 2. **Apply Your Knowledge**: See [How to Analyze Large Datasets](../how-to/analyze-large-datasets.md)
 3. **Go Deeper**: Read [Why Analyzers Use Two-Phase Computation](../explanation/analyzer-architecture.md)
 

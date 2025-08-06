@@ -1935,6 +1935,239 @@ impl CheckBuilder {
         )
     }
 
+    /// Adds a foreign key constraint for referential integrity validation.
+    ///
+    /// This constraint ensures that all values in the child table's foreign key column
+    /// exist as values in the parent table's referenced column. This is essential for
+    /// maintaining data consistency and preventing orphaned records in joined datasets.
+    ///
+    /// # Arguments
+    ///
+    /// * `child_column` - The column in the child table (qualified as "table.column")
+    /// * `parent_column` - The column in the parent table (qualified as "table.column")
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use term_guard::core::{Check, Level};
+    ///
+    /// let check = Check::builder("referential_integrity")
+    ///     .level(Level::Error)
+    ///     .foreign_key("orders.customer_id", "customers.id")
+    ///     .foreign_key("order_items.order_id", "orders.id")
+    ///     .build();
+    /// ```
+    ///
+    /// # Foreign Key Configuration
+    ///
+    /// For more advanced configuration (null handling, join strategy, violation reporting),
+    /// use `ForeignKeyConstraint::new()` directly with the `constraint()` method:
+    ///
+    /// ```rust
+    /// use term_guard::core::Check;
+    /// use term_guard::constraints::ForeignKeyConstraint;
+    ///
+    /// let check = Check::builder("advanced_foreign_key")
+    ///     .constraint(
+    ///         ForeignKeyConstraint::new("orders.customer_id", "customers.id")
+    ///             .allow_nulls(true)
+    ///             .use_left_join(false)
+    ///             .max_violations_reported(50)
+    ///     )
+    ///     .build();
+    /// ```
+    ///
+    /// # Requirements
+    ///
+    /// This constraint requires that both referenced tables are available in the DataFusion
+    /// session context. When using with `JoinedSource`, ensure the joined source is registered
+    /// with the appropriate table name.
+    pub fn foreign_key(
+        mut self,
+        child_column: impl Into<String>,
+        parent_column: impl Into<String>,
+    ) -> Self {
+        use crate::constraints::ForeignKeyConstraint;
+        self.constraints.push(Arc::new(ForeignKeyConstraint::new(
+            child_column,
+            parent_column,
+        )));
+        self
+    }
+
+    /// Adds a constraint that validates sums between two tables match within tolerance.
+    ///
+    /// This is essential for Phase 2 joined data sources validation, ensuring that aggregated
+    /// values are consistent across related tables. Common use cases include validating that
+    /// order totals match payment amounts, or inventory quantities align with transaction logs.
+    ///
+    /// # Arguments
+    ///
+    /// * `left_column` - Left side column in table.column format (e.g., "orders.total")
+    /// * `right_column` - Right side column in table.column format (e.g., "payments.amount")
+    ///
+    /// # Examples
+    ///
+    /// ## Basic Cross-Table Sum Validation
+    ///
+    /// ```rust
+    /// use term_guard::core::{Check, Level};
+    ///
+    /// let check = Check::builder("financial_integrity")
+    ///     .level(Level::Error)
+    ///     .cross_table_sum("orders.total", "payments.amount")
+    ///     .build();
+    /// ```
+    ///
+    /// ## For Advanced Configuration, Use the Constraint Directly
+    ///
+    /// ```rust
+    /// use term_guard::core::Check;
+    /// use term_guard::constraints::CrossTableSumConstraint;
+    ///
+    /// let check = Check::builder("advanced_cross_table")
+    ///     .constraint(
+    ///         CrossTableSumConstraint::new("orders.total", "payments.amount")
+    ///             .group_by(vec!["customer_id"])
+    ///             .tolerance(0.01)
+    ///             .max_violations_reported(50)
+    ///     )
+    ///     .build();
+    /// ```
+    ///
+    /// # Requirements
+    ///
+    /// This constraint requires that both referenced tables are available in the DataFusion
+    /// session context. When using with `JoinedSource`, ensure the joined source is registered
+    /// with the appropriate table names and that the tables can be joined on the specified
+    /// group-by columns if provided.
+    pub fn cross_table_sum(
+        mut self,
+        left_column: impl Into<String>,
+        right_column: impl Into<String>,
+    ) -> Self {
+        use crate::constraints::CrossTableSumConstraint;
+        self.constraints.push(Arc::new(CrossTableSumConstraint::new(
+            left_column,
+            right_column,
+        )));
+        self
+    }
+
+    /// Adds a join coverage constraint for validating join quality.
+    ///
+    /// This constraint measures what percentage of rows from the left table successfully
+    /// join with the right table, helping identify missing reference data, data quality
+    /// issues in foreign key relationships, and incomplete data loads.
+    ///
+    /// # Arguments
+    ///
+    /// * `left_table` - Name of the left table in the join
+    /// * `right_table` - Name of the right table in the join
+    ///
+    /// # Examples
+    ///
+    /// ## Basic Usage
+    ///
+    /// ```rust
+    /// use term_guard::core::{Check, Level};
+    ///
+    /// let check = Check::builder("join_quality")
+    ///     .level(Level::Warning)
+    ///     .join_coverage("sales", "customers")
+    ///     .build();
+    /// ```
+    ///
+    /// ## For Advanced Configuration, Use the Constraint Directly
+    ///
+    /// ```rust
+    /// use term_guard::core::Check;
+    /// use term_guard::constraints::{JoinCoverageConstraint, CoverageType};
+    ///
+    /// let check = Check::builder("advanced_join_coverage")
+    ///     .constraint(
+    ///         JoinCoverageConstraint::new("orders", "products")
+    ///             .on_multiple(vec![("product_id", "id"), ("variant", "variant_code")])
+    ///             .expect_match_rate(0.98)
+    ///             .coverage_type(CoverageType::BidirectionalCoverage)
+    ///             .distinct_only(true)
+    ///     )
+    ///     .build();
+    /// ```
+    ///
+    /// # Requirements
+    ///
+    /// Both tables must be registered with the DataFusion session context.
+    /// Use `.on()` or `.on_multiple()` on the constraint to specify join keys.
+    pub fn join_coverage(
+        mut self,
+        left_table: impl Into<String>,
+        right_table: impl Into<String>,
+    ) -> Self {
+        use crate::constraints::JoinCoverageConstraint;
+        self.constraints.push(Arc::new(JoinCoverageConstraint::new(
+            left_table,
+            right_table,
+        )));
+        self
+    }
+
+    /// Adds a temporal ordering constraint for time-based validation.
+    ///
+    /// This constraint ensures that temporal data follows expected patterns, including
+    /// chronological ordering between columns, business hour compliance, date range
+    /// validation, and event sequence validation.
+    ///
+    /// # Arguments
+    ///
+    /// * `table_name` - Name of the table to validate
+    ///
+    /// # Examples
+    ///
+    /// ## Basic Temporal Ordering
+    ///
+    /// ```rust
+    /// use term_guard::core::{Check, Level};
+    ///
+    /// let check = Check::builder("temporal_consistency")
+    ///     .level(Level::Error)
+    ///     .temporal_ordering("events")
+    ///     .build();
+    /// ```
+    ///
+    /// ## For Advanced Configuration, Use the Constraint Directly
+    ///
+    /// ```rust
+    /// use term_guard::core::Check;
+    /// use term_guard::constraints::TemporalOrderingConstraint;
+    ///
+    /// let check = Check::builder("advanced_temporal")
+    ///     .constraint(
+    ///         TemporalOrderingConstraint::new("transactions")
+    ///             .business_hours("timestamp", "09:00", "17:00")
+    ///             .weekdays_only(true)
+    ///             .with_timezone("America/New_York")
+    ///     )
+    ///     .constraint(
+    ///         TemporalOrderingConstraint::new("events")
+    ///             .before_after("created_at", "processed_at")
+    ///             .tolerance_seconds(60)
+    ///             .allow_nulls(true)
+    ///     )
+    ///     .build();
+    /// ```
+    ///
+    /// # Requirements
+    ///
+    /// The table must be registered with the DataFusion session context.
+    /// Configure the specific temporal validation type using the constraint's methods.
+    pub fn temporal_ordering(mut self, table_name: impl Into<String>) -> Self {
+        use crate::constraints::TemporalOrderingConstraint;
+        self.constraints
+            .push(Arc::new(TemporalOrderingConstraint::new(table_name)));
+        self
+    }
+
     /// Adds a constraint using a fluent constraint builder.
     ///
     /// This method provides the most flexible API for building complex constraints
@@ -2367,5 +2600,23 @@ mod tests {
             .build();
 
         assert_eq!(check.constraints().len(), 6);
+    }
+
+    #[test]
+    fn test_cross_table_sum_builder_method() {
+        let check = Check::builder("cross_table_sum_test")
+            .level(Level::Error)
+            .cross_table_sum("orders.total", "payments.amount")
+            .cross_table_sum("inventory.quantity", "transactions.quantity")
+            .build();
+
+        assert_eq!(check.constraints().len(), 2);
+        assert_eq!(check.name(), "cross_table_sum_test");
+        assert_eq!(check.level(), Level::Error);
+
+        // Verify that both constraints are cross-table sum constraints
+        for constraint in check.constraints() {
+            assert_eq!(constraint.name(), "cross_table_sum");
+        }
     }
 }

@@ -37,12 +37,12 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
         with:
+          toolchain: stable
           components: rustfmt, clippy
-
-      - uses: Swatinem/rust-cache@v2
+          cache-key: "cache-fork-pr"
 
       - name: Check formatting
         run: cargo fmt --all -- --check

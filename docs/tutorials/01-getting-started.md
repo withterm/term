@@ -231,7 +231,7 @@ Congratulations! You've learned how to:
 
 Now that you understand the basics, you're ready to:
 
-1. **Continue Learning**: Try the [Working with Constraints](./02-basic-constraints.md) tutorial
+1. **Continue Learning**: Try the [Validating CSV Files](./02-validating-csv-files.md) tutorial
 2. **Apply Your Knowledge**: See [How to Validate CSV Files](../how-to/validate-csv-files.md)
 3. **Go Deeper**: Read [Understanding Constraints](../explanation/constraint-design.md)
 

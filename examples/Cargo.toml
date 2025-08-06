@@ -8,7 +8,7 @@ license = "MIT"
 
 [dependencies]
 arrow = "55"
-datafusion = "49.0"
+datafusion = "48.0"
 opentelemetry = { version = "0.24", optional = true }
 opentelemetry_sdk = { version = "0.24", features = ["rt-tokio-current-thread", "testing"], optional = true }
 tracing-opentelemetry = { version = "0.25", optional = true }

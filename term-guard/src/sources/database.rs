@@ -98,8 +98,6 @@ impl DatabaseConfig {
             DatabaseConfig::MySQL { .. } => "MySQL",
             #[cfg(feature = "sqlite")]
             DatabaseConfig::SQLite(_) => "SQLite",
-            #[cfg(not(any(feature = "postgres", feature = "mysql", feature = "sqlite")))]
-            _ => "Unknown",
         }
     }
 }
@@ -213,10 +211,9 @@ impl DatabaseSource {
                 username,
                 password,
             } => {
-                let connection_string = format!(
-                    "mysql://{username}:{}@{host}:{port}/{database}",
-                    password.expose()
-                );
+                let password_str = password.expose();
+                let connection_string =
+                    format!("mysql://{username}:{password_str}@{host}:{port}/{database}");
                 let mut params = std::collections::HashMap::new();
                 params.insert("connection_string".to_string(), connection_string);
                 params.insert("sslmode".to_string(), "disabled".to_string());
@@ -276,11 +273,6 @@ impl DatabaseSource {
                         source: None,
                     })
             }
-            #[cfg(not(any(feature = "postgres", feature = "mysql", feature = "sqlite")))]
-            _ => Err(TermError::Configuration(
-                "No database features enabled. Enable 'postgres', 'mysql', or 'sqlite' feature."
-                    .to_string(),
-            )),
         }
     }
 }
@@ -326,10 +318,8 @@ impl super::DataSource for DatabaseSource {
                 database,
                 ..
             } => {
-                format!(
-                    "PostgreSQL table '{}' at {host}:{port}/{database}",
-                    self.table_name
-                )
+                let table_name = &self.table_name;
+                format!("PostgreSQL table '{table_name}' at {host}:{port}/{database}")
             }
             #[cfg(feature = "mysql")]
             DatabaseConfig::MySQL {
@@ -338,22 +328,13 @@ impl super::DataSource for DatabaseSource {
                 database,
                 ..
             } => {
-                format!(
-                    "MySQL table '{}' at {host}:{port}/{database}",
-                    self.table_name
-                )
+                let table_name = &self.table_name;
+                format!("MySQL table '{table_name}' at {host}:{port}/{database}")
             }
             #[cfg(feature = "sqlite")]
             DatabaseConfig::SQLite(path) => {
                 let table_name = &self.table_name;
                 format!("SQLite table '{table_name}' at {path}")
-            }
-            #[cfg(not(any(feature = "postgres", feature = "mysql", feature = "sqlite")))]
-            _ => {
-                format!(
-                    "Database table '{}' (no database features enabled)",
-                    self.table_name
-                )
             }
         }
     }

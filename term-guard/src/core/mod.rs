@@ -113,6 +113,7 @@ mod constraint;
 mod context;
 mod level;
 mod logical;
+mod multi_source;
 mod result;
 mod suite;
 mod unified;
@@ -125,6 +126,7 @@ pub use constraint::{Constraint, ConstraintMetadata, ConstraintResult, Constrain
 pub use context::{TermContext, TermContextConfig};
 pub use level::Level;
 pub use logical::{ColumnSpec, ConstraintOptionsBuilder, LogicalOperator, LogicalResult};
+pub use multi_source::{CacheStats, MultiSourceValidator};
 pub use result::{ValidationIssue, ValidationMetrics, ValidationReport, ValidationResult};
 pub use suite::{ValidationSuite, ValidationSuiteBuilder};
 pub use unified::{ConstraintOptions, UnifiedCompletenessBase, UnifiedConstraint};

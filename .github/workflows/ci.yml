@@ -16,71 +16,114 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   RUSTFLAGS: -D warnings
-  CARGO_INCREMENTAL: 1  # Enable for better caching
-  CARGO_BUILD_JOBS: 4   # Match Blacksmith vCPU count
-  RUST_TEST_THREADS: 4  # Match Blacksmith vCPU count
+  CARGO_INCREMENTAL: 1
+  CARGO_BUILD_JOBS: 4
+  RUST_TEST_THREADS: 4
   RUST_BACKTRACE: 1
 
 jobs:
-  test:
-    name: Test Suite
+  unit-tests:
+    name: Unit Tests
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30  # Prevent runaway jobs
+    timeout-minutes: 15
     strategy:
       matrix:
-        # os: [blacksmith-4vcpu-ubuntu-2404, macos-latest, windows-latest]
         os: [blacksmith-4vcpu-ubuntu-2404]
-        rust: [stable, 1.70.0] # MSRV is 1.70
-      max-parallel: 3  # Limit concurrent jobs
+        rust: [stable, 1.70.0]
+      max-parallel: 4
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
         with:
           toolchain: ${{ matrix.rust }}
+          cache-key: "cache-unit-${{ runner.os }}-${{ matrix.rust }}"
 
-      - name: Cache Rust dependencies
-        uses: useblacksmith/cache@v6
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ matrix.rust }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-${{ matrix.rust }}-
-            ${{ runner.os }}-cargo-
-
-      - name: Cache Statistics (Before)
-        run: |
-          echo "=== Cache Statistics (Before Build) ==="
-          echo "Cargo registry: $(du -sh ~/.cargo/registry 2>/dev/null | cut -f1 || echo 'Not found')"
-          echo "Cargo git: $(du -sh ~/.cargo/git 2>/dev/null | cut -f1 || echo 'Not found')"
-          echo "Target dir: $(du -sh target 2>/dev/null | cut -f1 || echo 'Not found')"
-
-      - name: Build dependencies first
-        run: |
-          # Build dependencies separately for better caching
-          cargo build --all-features --lib --bins
-          cargo build --all-features --tests --no-run
-
-      - name: Run tests
-        run: cargo test --all-features
-
-      - name: Run tests (no default features)
-        run: cargo test --no-default-features
-
-      - name: Cache Statistics (After)
-        if: always()
-        run: |
-          echo "=== Cache Statistics (After Build) ==="
-          echo "Cargo registry: $(du -sh ~/.cargo/registry | cut -f1)"
-          echo "Cargo git: $(du -sh ~/.cargo/git | cut -f1)"
-          echo "Target dir: $(du -sh target | cut -f1)"
+      - name: Run unit tests
+        run: cargo test --lib --all-features
 
       - name: Run doc tests
         run: cargo test --doc
+
+  integration-tests:
+    name: Integration Tests (Group ${{ matrix.group }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      matrix:
+        os: [blacksmith-8vcpu-ubuntu-2404]
+        rust: [stable, 1.70.0]
+        group: [1, 2, 3] # Split tests into 3 parallel groups
+      max-parallel: 6
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+        with:
+          toolchain: ${{ matrix.rust }}
+          cache-key: "cache-integration-${{ runner.os }}-${{ matrix.rust }}-${{ matrix.group }}"
+
+      - name: Run integration tests (Group 1)
+        if: matrix.group == 1
+        run: |
+          cargo test --test analysis_runner_integration --all-features
+          cargo test --test analyzer_integration_tests --all-features
+          cargo test --test anomaly_detection_integration --all-features
+          cargo test --test approx_count_distinct_integration --all-features
+          cargo test --test builder_extensions_test --all-features
+          cargo test --test cloud_storage_test --all-features
+          cargo test --test column_count_integration --all-features
+          cargo test --test column_profiler_integration --all-features
+          cargo test --test completeness_integration --all-features
+          cargo test --test context_integration --all-features
+
+      - name: Run integration tests (Group 2)
+        if: matrix.group == 2
+        run: |
+          cargo test --test data_type_integration --all-features
+          cargo test --test distinctness_integration --all-features
+          cargo test --test exact_quantile_integration --all-features
+          cargo test --test histogram_integration --all-features
+          cargo test --test integration_test_suite --all-features
+          cargo test --test joined_sources_integration --all-features
+          cargo test --test metrics_test --all-features
+          cargo test --test multi_source_integration --all-features
+          cargo test --test optimizer_integration --all-features
+
+      - name: Run integration tests (Group 3)
+        if: matrix.group == 3
+        run: |
+          cargo test --test performance_regression_test --all-features
+          cargo test --test property_tests --all-features
+          cargo test --test security_tests --all-features
+          cargo test --test sources_integration --all-features
+          cargo test --test string_length_integration --all-features
+          cargo test --test structured_logging_test --all-features
+          cargo test --test test_utils_test --all-features
+          cargo test --test type_inference_integration --all-features
+          cargo test --test unique_value_ratio_integration --all-features
+
+  # Feature combination tests
+  feature-tests:
+    name: Feature Tests
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        rust: [stable]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+        with:
+          toolchain: ${{ matrix.rust }}
+          cache-key: "cache-features-${{ runner.os }}-${{ matrix.rust }}"
+
+      - name: Run tests (no default features)
+        run: cargo test --no-default-features
 
   fmt:
     name: Rustfmt
@@ -89,10 +132,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
         with:
+          toolchain: stable
           components: rustfmt
+          cache-key: "cache-fmt"
 
       - name: Check formatting
         run: cargo fmt --all -- --check
@@ -104,22 +149,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
         with:
+          toolchain: stable
           components: clippy
-
-      - name: Cache Rust dependencies
-        uses: useblacksmith/cache@v6
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-clippy-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-stable-
-            ${{ runner.os }}-cargo-
+          cache-key: "cache-clippy"
 
       - name: Run clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
@@ -131,20 +166,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Rust dependencies
-        uses: useblacksmith/cache@v6
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-coverage-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-stable-
-            ${{ runner.os }}-cargo-
+          toolchain: stable
+          cache-key: "cache-coverage"
 
       - name: Install tarpaulin
         run: cargo install cargo-tarpaulin
@@ -166,20 +192,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install MSRV toolchain
-        uses: dtolnay/rust-toolchain@1.70.0
-
-      - name: Cache Rust dependencies
-        uses: useblacksmith/cache@v6
+      - name: Setup Rust (MSRV)
+        uses: ./.github/actions/setup-rust
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-msrv-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-1.70.0-
-            ${{ runner.os }}-cargo-
+          toolchain: 1.70.0
+          cache-key: "cache-msrv"
 
       - name: Check MSRV
         run: cargo check --all-features
@@ -191,20 +208,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Rust dependencies
-        uses: useblacksmith/cache@v6
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-build-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-stable-
-            ${{ runner.os }}-cargo-
+          toolchain: stable
+          cache-key: "cache-build"
 
       - name: Build
         run: cargo build --release --all-features
@@ -219,20 +227,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Rust dependencies
-        uses: useblacksmith/cache@v6
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-integration-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-stable-
-            ${{ runner.os }}-cargo-
+          toolchain: stable
+          cache-key: "cache-integration"
 
       - name: Run integration tests
         run: cargo integration
