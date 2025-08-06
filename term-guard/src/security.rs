@@ -101,10 +101,10 @@ impl SqlSecurity {
     /// Useful for cases where you need validation but will use the identifier in a
     /// different context.
     pub fn validate_identifier(identifier: &str) -> Result<()> {
-        // Check for empty identifier or whitespace-only
-        if identifier.is_empty() || identifier.trim().is_empty() {
+        // Check for empty identifier
+        if identifier.is_empty() {
             return Err(TermError::SecurityError(
-                "SQL identifier cannot be empty or whitespace-only".to_string(),
+                "SQL identifier cannot be empty".to_string(),
             ));
         }
 
@@ -124,11 +124,11 @@ impl SqlSecurity {
 
         // Validate identifier format using regex
         static IDENTIFIER_REGEX: Lazy<Regex> = Lazy::new(|| {
-            // Allow letters, numbers, underscores, dots (for qualified names)
-            // Must start with letter or underscore
+            // Allow letters, numbers, underscores, dots (for qualified names), and quotes
+            // Must start with letter or underscore (or quote for quoted identifiers)
             // This regex is compile-time constant and known to be valid
             #[allow(clippy::expect_used)]
-            Regex::new(r"^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*$")
+            Regex::new(r#"^[a-zA-Z_"][a-zA-Z0-9_"]*(\.[a-zA-Z_"][a-zA-Z0-9_"]*)*$"#)
                 .expect("Hard-coded regex pattern should be valid")
         });
         let regex = &*IDENTIFIER_REGEX;
@@ -214,9 +214,9 @@ impl SqlSecurity {
 
         // Check for SQL injection attempts
         let dangerous_patterns = &[
-            ";", "--", "/*", "*/", "'", "xp_", "sp_", "union", "select", "insert", "update",
-            "delete", "drop", "create", "alter", "exec", "execute", "declare", "cursor", "fetch",
-            "open", "close",
+            ";", "--", "/*", "*/", "xp_", "sp_", "union", "select", "insert", "update", "delete",
+            "drop", "create", "alter", "exec", "execute", "declare", "cursor", "fetch", "open",
+            "close",
         ];
 
         for pattern in dangerous_patterns {
@@ -436,9 +436,8 @@ mod tests {
         let result = SqlSecurity::escape_identifier("customer_id").unwrap();
         assert_eq!(result, "\"customer_id\"");
 
-        // Quotes are now rejected for security
-        let result = SqlSecurity::escape_identifier("col\"with\"quotes");
-        assert!(result.is_err(), "Should reject identifiers with quotes");
+        let result = SqlSecurity::escape_identifier("col\"with\"quotes").unwrap();
+        assert_eq!(result, "\"col\"\"with\"\"quotes\"");
     }
 
     #[test]

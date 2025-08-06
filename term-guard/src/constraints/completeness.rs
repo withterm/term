@@ -152,11 +152,9 @@ impl UnifiedConstraint for CompletenessConstraint {
 
         // Get the table name from the validation context
         let validation_ctx = current_validation_context();
-        // Use the original table name since it's already been validated
         let table_name = validation_ctx.table_name();
 
         // Build SQL query to calculate completeness
-        // Note: table_name is safe because it was validated when creating ValidationContext
         let sql = format!(
             "SELECT 
                 COUNT(*) as total_count,

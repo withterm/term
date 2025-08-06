@@ -11,6 +11,7 @@ use std::fmt::Debug;
 use std::sync::Arc;
 
 mod csv;
+mod joined;
 mod json;
 mod parquet;
 
@@ -21,6 +22,7 @@ mod database;
 mod cloud;
 
 pub use csv::{CsvOptions, CsvSource};
+pub use joined::{JoinCondition, JoinType, JoinedSource};
 pub use json::{JsonOptions, JsonSource};
 pub use parquet::{ParquetOptions, ParquetSource};
 

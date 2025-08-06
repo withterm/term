@@ -16,9 +16,9 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   RUSTFLAGS: -D warnings
-  CARGO_INCREMENTAL: 1  # Enable for better caching
-  CARGO_BUILD_JOBS: 4   # Match Blacksmith vCPU count
-  RUST_TEST_THREADS: 4  # Match Blacksmith vCPU count
+  CARGO_INCREMENTAL: 1
+  CARGO_BUILD_JOBS: 4
+  RUST_TEST_THREADS: 4
   RUST_BACKTRACE: 1
 
 jobs:
@@ -35,49 +35,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
         with:
           toolchain: ${{ matrix.rust }}
-
-      - name: Cache Rust dependencies
-        uses: useblacksmith/cache@v6
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ matrix.rust }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-${{ matrix.rust }}-
-            ${{ runner.os }}-cargo-
-
-      - name: Cache Statistics (Before)
-        run: |
-          echo "=== Cache Statistics (Before Build) ==="
-          echo "Cargo registry: $(du -sh ~/.cargo/registry 2>/dev/null | cut -f1 || echo 'Not found')"
-          echo "Cargo git: $(du -sh ~/.cargo/git 2>/dev/null | cut -f1 || echo 'Not found')"
-          echo "Target dir: $(du -sh target 2>/dev/null | cut -f1 || echo 'Not found')"
-
-      - name: Build dependencies first
-        run: |
-          # Build dependencies separately for better caching
-          cargo build --all-features --lib --bins
-          cargo build --all-features --tests --no-run
+          cache-key: "cache-tests-${{ runner.os }}-${{ matrix.rust }}"
 
       - name: Run tests
         run: cargo test --all-features
 
       - name: Run tests (no default features)
         run: cargo test --no-default-features
-
-      - name: Cache Statistics (After)
-        if: always()
-        run: |
-          echo "=== Cache Statistics (After Build) ==="
-          echo "Cargo registry: $(du -sh ~/.cargo/registry | cut -f1)"
-          echo "Cargo git: $(du -sh ~/.cargo/git | cut -f1)"
-          echo "Target dir: $(du -sh target | cut -f1)"
 
       - name: Run doc tests
         run: cargo test --doc
@@ -89,10 +57,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
         with:
+          toolchain: stable
           components: rustfmt
+          cache-key: "cache-fmt"
 
       - name: Check formatting
         run: cargo fmt --all -- --check
@@ -104,22 +74,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
         with:
+          toolchain: stable
           components: clippy
-
-      - name: Cache Rust dependencies
-        uses: useblacksmith/cache@v6
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-clippy-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-stable-
-            ${{ runner.os }}-cargo-
+          cache-key: "cache-clippy"
 
       - name: Run clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
@@ -131,20 +91,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Rust dependencies
-        uses: useblacksmith/cache@v6
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-coverage-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-stable-
-            ${{ runner.os }}-cargo-
+          toolchain: stable
+          cache-key: "cache-coverage"
 
       - name: Install tarpaulin
         run: cargo install cargo-tarpaulin
@@ -166,20 +117,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install MSRV toolchain
-        uses: dtolnay/rust-toolchain@1.70.0
-
-      - name: Cache Rust dependencies
-        uses: useblacksmith/cache@v6
+      - name: Setup Rust (MSRV)
+        uses: ./.github/actions/setup-rust
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-msrv-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-1.70.0-
-            ${{ runner.os }}-cargo-
+          toolchain: 1.70.0
+          cache-key: "cache-msrv"
 
       - name: Check MSRV
         run: cargo check --all-features
@@ -191,20 +133,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Rust dependencies
-        uses: useblacksmith/cache@v6
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-build-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-stable-
-            ${{ runner.os }}-cargo-
+          toolchain: stable
+          cache-key: "cache-build"
 
       - name: Build
         run: cargo build --release --all-features
@@ -219,20 +152,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Rust dependencies
-        uses: useblacksmith/cache@v6
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-integration-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-stable-
-            ${{ runner.os }}-cargo-
+          toolchain: stable
+          cache-key: "cache-integration"
 
       - name: Run integration tests
         run: cargo integration

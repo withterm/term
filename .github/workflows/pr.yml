@@ -26,12 +26,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
         with:
+          toolchain: stable
           components: rustfmt, clippy
-      
-      - uses: Swatinem/rust-cache@v2
+          cache-key: "cache-pr-validation"
       
       - name: Check formatting
         run: cargo fmt --all -- --check
@@ -42,8 +42,11 @@ jobs:
       - name: Run tests
         run: cargo test --all-features
       
-      - name: Check MSRV
-        uses: dtolnay/rust-toolchain@1.70.0
+      - name: Setup Rust (MSRV)
+        uses: ./.github/actions/setup-rust
+        with:
+          toolchain: 1.70.0
+          cache-key: "cache-pr-msrv"
       
       - name: MSRV check
         run: cargo check --all-features
