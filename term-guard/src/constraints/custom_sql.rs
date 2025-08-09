@@ -200,8 +200,6 @@ impl Constraint for CustomSqlConstraint {
 
         let table_name = validation_ctx.table_name();
 
-        
-
         let sql = format!(
             "SELECT 
                 COUNT(CASE WHEN {} THEN 1 END) as satisfied,
@@ -398,7 +396,9 @@ mod tests {
 
         let constraint = CustomSqlConstraint::new("price > 0", None::<String>).unwrap();
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert_eq!(result.metric, Some(0.8)); // 4 out of 5 rows satisfy (NULL doesn't satisfy)
     }
@@ -410,7 +410,9 @@ mod tests {
         // Using quantity > -1 will be true for all rows (all quantities are >= 0)
         let constraint = CustomSqlConstraint::new("quantity >= 0", None::<String>).unwrap();
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(1.0)); // All rows satisfy
     }
@@ -422,7 +424,9 @@ mod tests {
         let constraint =
             CustomSqlConstraint::new("quantity > 0", Some("Quantity must be positive")).unwrap();
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert_eq!(result.metric, Some(0.8)); // 4 out of 5 have quantity > 0
         assert!(result
@@ -443,7 +447,9 @@ mod tests {
         )
         .unwrap();
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
         // Only 3 rows have status='active' AND price >= 10
         assert_eq!(result.metric, Some(0.6));
@@ -455,7 +461,9 @@ mod tests {
 
         let constraint = CustomSqlConstraint::new("price IS NOT NULL", None::<String>).unwrap();
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert_eq!(result.metric, Some(0.8)); // 4 out of 5 have non-null price
     }
@@ -466,7 +474,9 @@ mod tests {
 
         let constraint = CustomSqlConstraint::new("invalid_column > 0", None::<String>).unwrap();
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert!(result
             .message

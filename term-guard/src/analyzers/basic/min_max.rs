@@ -93,8 +93,6 @@ impl Analyzer for MinAnalyzer {
 
         let table_name = validation_ctx.table_name();
 
-        
-
         let sql = format!(
             "SELECT MIN({0}) as min, MAX({0}) as max FROM {table_name}",
             self.column
@@ -242,7 +240,7 @@ impl Analyzer for MaxAnalyzer {
         // Get the table name from the validation context
         let validation_ctx = current_validation_context();
         let table_name = validation_ctx.table_name();
-        
+
         // Build SQL query to compute max (we compute both for efficiency)
         let sql = format!(
             "SELECT MIN({0}) as min, MAX({0}) as max FROM {table_name}",

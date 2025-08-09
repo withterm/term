@@ -61,10 +61,11 @@ jobs:
         with:
           ref: ${{ github.event.release.tag_name }}
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+        with:
+          toolchain: stable
+          cache-key: "cache-pre-release"
 
       - name: Run tests
         run: cargo test --all-features
@@ -99,10 +100,11 @@ jobs:
         with:
           ref: ${{ github.event.release.tag_name }}
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+        with:
+          toolchain: stable
+          cache-key: "cache-publish"
 
       - name: Publish to crates.io
         env:

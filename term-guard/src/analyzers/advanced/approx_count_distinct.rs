@@ -111,8 +111,6 @@ impl Analyzer for ApproxCountDistinctAnalyzer {
 
         let table_name = validation_ctx.table_name();
 
-        
-
         let sql = format!(
             "SELECT APPROX_DISTINCT({0}) as approx_distinct, COUNT({0}) as total FROM {table_name}",
             self.column

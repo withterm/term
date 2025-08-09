@@ -249,7 +249,7 @@ impl QuantileConstraint {
                 // Get the table name from the validation context
                 let validation_ctx = current_validation_context();
                 let table_name = validation_ctx.table_name();
-                
+
                 let count_sql = format!("SELECT COUNT(*) as cnt FROM {table_name}");
                 let df = ctx.sql(&count_sql).await?;
                 let batches = df.collect().await?;
@@ -290,8 +290,6 @@ impl Constraint for QuantileConstraint {
                 let validation_ctx = current_validation_context();
 
                 let table_name = validation_ctx.table_name();
-
-                
 
                 let sql = format!(
                     "SELECT {} as q_value FROM {table_name}",
@@ -353,7 +351,7 @@ impl Constraint for QuantileConstraint {
                 // Get the table name from the validation context
                 let validation_ctx = current_validation_context();
                 let table_name = validation_ctx.table_name();
-                
+
                 let sql = format!("SELECT {parts} FROM {table_name}");
                 let df = ctx.sql(&sql).await?;
                 let batches = df.collect().await?;
@@ -417,7 +415,7 @@ impl Constraint for QuantileConstraint {
                 // Get the table name from the validation context
                 let validation_ctx = current_validation_context();
                 let table_name = validation_ctx.table_name();
-                
+
                 let sql = format!("SELECT {parts} FROM {table_name}");
                 let df = ctx.sql(&sql).await?;
                 let batches = df.collect().await?;
@@ -533,7 +531,9 @@ mod tests {
         let constraint =
             QuantileConstraint::median("value", Assertion::Between(45.0, 55.0)).unwrap();
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
     }
 
@@ -545,7 +545,9 @@ mod tests {
         let constraint =
             QuantileConstraint::percentile("value", 0.95, Assertion::Between(94.0, 96.0)).unwrap();
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
     }
 
@@ -563,7 +565,9 @@ mod tests {
         )
         .unwrap();
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
     }
 
@@ -581,7 +585,9 @@ mod tests {
         )
         .unwrap();
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
     }
 

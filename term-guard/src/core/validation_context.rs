@@ -46,10 +46,10 @@ impl ValidationContext {
     /// ```rust
     /// use term_guard::core::ValidationContext;
     ///
-    /// let ctx = ValidationContext::default();
+    /// let ctx = ValidationContext::with_default_table();
     /// assert_eq!(ctx.table_name(), "data");
     /// ```
-    pub fn default() -> Self {
+    pub fn with_default_table() -> Self {
         Self::new("data")
     }
 
@@ -61,7 +61,7 @@ impl ValidationContext {
 
 impl Default for ValidationContext {
     fn default() -> Self {
-        Self::default()
+        Self::new("data")
     }
 }
 
@@ -78,7 +78,7 @@ tokio::task_local! {
 pub fn current_validation_context() -> ValidationContext {
     CURRENT_CONTEXT
         .try_with(|ctx| ctx.clone())
-        .unwrap_or_else(|_| ValidationContext::default())
+        .unwrap_or_else(|_| ValidationContext::with_default_table())
 }
 
 #[cfg(test)]
@@ -93,7 +93,7 @@ mod tests {
 
     #[test]
     fn test_validation_context_default() {
-        let ctx = ValidationContext::default();
+        let ctx = ValidationContext::with_default_table();
         assert_eq!(ctx.table_name(), "data");
     }
 

@@ -450,9 +450,9 @@ impl Constraint for UniquenessConstraint {
         // Get the table name from the validation context
         let validation_ctx = current_validation_context();
         let table_name = validation_ctx.table_name();
-        
+
         // Generate SQL based on uniqueness type
-        let sql = self.generate_sql(&table_name)?;
+        let sql = self.generate_sql(table_name)?;
 
         let df = ctx.sql(&sql).await?;
         let batches = df.collect().await?;
@@ -536,7 +536,9 @@ impl UniquenessConstraint {
         match &self.uniqueness_type {
             UniquenessType::FullUniqueness { .. }
             | UniquenessType::UniqueWithNulls { .. }
-            | UniquenessType::UniqueComposite { .. } => self.generate_full_uniqueness_sql(table_name),
+            | UniquenessType::UniqueComposite { .. } => {
+                self.generate_full_uniqueness_sql(table_name)
+            }
             UniquenessType::Distinctness(_) => self.generate_distinctness_sql(table_name),
             UniquenessType::UniqueValueRatio(_) => self.generate_unique_value_ratio_sql(table_name),
             UniquenessType::PrimaryKey => self.generate_primary_key_sql(table_name),
@@ -909,7 +911,9 @@ mod tests {
 
         let constraint = UniquenessConstraint::full_uniqueness("test_col", 0.7).unwrap();
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(0.75)); // 3 unique out of 4 total
     }
@@ -922,7 +926,9 @@ mod tests {
         // Standard uniqueness (excludes NULLs from distinct count)
         let constraint = UniquenessConstraint::full_uniqueness("test_col", 0.4).unwrap();
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(0.5)); // 2 unique non-null out of 4 total
     }
@@ -935,7 +941,9 @@ mod tests {
         let constraint =
             UniquenessConstraint::distinctness(vec!["test_col"], Assertion::Equals(0.75)).unwrap();
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(0.75)); // 3 distinct out of 4 total
     }
@@ -949,7 +957,9 @@ mod tests {
             UniquenessConstraint::unique_value_ratio(vec!["test_col"], Assertion::Equals(0.5))
                 .unwrap();
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(0.5)); // 2 values appear exactly once out of 4 total
     }
@@ -961,7 +971,9 @@ mod tests {
 
         let constraint = UniquenessConstraint::primary_key(vec!["test_col"]).unwrap();
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(1.0));
     }
@@ -973,7 +985,9 @@ mod tests {
 
         let constraint = UniquenessConstraint::primary_key(vec!["test_col"]).unwrap();
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert!(result.message.unwrap().contains("NULL values"));
     }
@@ -985,7 +999,9 @@ mod tests {
 
         let constraint = UniquenessConstraint::primary_key(vec!["test_col"]).unwrap();
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert!(result.message.unwrap().contains("duplicate values"));
     }
@@ -999,7 +1015,9 @@ mod tests {
         let constraint =
             UniquenessConstraint::full_uniqueness_multi(vec!["col1", "col2"], 0.9).unwrap();
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(1.0)); // All combinations are unique
     }
@@ -1014,7 +1032,9 @@ mod tests {
             UniquenessConstraint::distinctness(vec!["col1", "col2"], Assertion::GreaterThan(0.5))
                 .unwrap();
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         // Two distinct combinations: A|1 and B|2, plus A|1 repeated = 2/3 = 0.67
         assert!((result.metric.unwrap() - 2.0 / 3.0).abs() < 0.01);
@@ -1029,7 +1049,9 @@ mod tests {
             UniquenessConstraint::unique_with_nulls(vec!["test_col"], 0.4, NullHandling::Include)
                 .unwrap();
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(0.75)); // A, B, NULL (treated as one value) = 3/4
     }
@@ -1041,7 +1063,9 @@ mod tests {
 
         let constraint = UniquenessConstraint::full_uniqueness("test_col", 1.0).unwrap();
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Skipped);
     }
 

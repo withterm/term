@@ -179,7 +179,7 @@ impl Analyzer for HistogramAnalyzer {
         // Get the table name from the validation context
         let validation_ctx = current_validation_context();
         let table_name = validation_ctx.table_name();
-        
+
         // First, get min/max values to determine bucket boundaries
         let stats_sql = format!(
             "SELECT 

@@ -98,7 +98,7 @@ impl ValidationSuite {
                 let result = crate::core::validation_context::CURRENT_CONTEXT
                     .scope(validation_ctx, constraint.evaluate(ctx))
                     .await;
-                
+
                 match result {
                     Ok(result) => {
                         // Record constraint result in telemetry

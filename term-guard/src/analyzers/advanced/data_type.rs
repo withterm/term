@@ -123,7 +123,7 @@ impl Analyzer for DataTypeAnalyzer {
         // Get the table name from the validation context
         let validation_ctx = current_validation_context();
         let table_name = validation_ctx.table_name();
-        
+
         // Build SQL query to categorize values by their inferred type
         // This uses SQL type checking functions to infer types
         let sql = format!(
