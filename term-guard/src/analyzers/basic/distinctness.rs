@@ -110,8 +110,6 @@ impl Analyzer for DistinctnessAnalyzer {
 
         let table_name = validation_ctx.table_name();
 
-        
-
         let sql = format!(
             "SELECT COUNT({0}) as total_count, COUNT(DISTINCT {0}) as distinct_count FROM {table_name}",
             self.column

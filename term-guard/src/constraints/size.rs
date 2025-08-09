@@ -63,8 +63,6 @@ impl Constraint for SizeConstraint {
 
         let table_name = validation_ctx.table_name();
 
-        
-
         let sql = format!("SELECT COUNT(*) as row_count FROM {table_name}");
 
         // Execute query
@@ -173,7 +171,9 @@ mod tests {
         let ctx = create_test_context(100).await;
         let constraint = SizeConstraint::new(Assertion::Equals(100.0));
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(100.0));
     }
@@ -183,7 +183,9 @@ mod tests {
         let ctx = create_test_context(50).await;
         let constraint = SizeConstraint::new(Assertion::GreaterThan(25.0));
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(50.0));
     }
@@ -193,7 +195,9 @@ mod tests {
         let ctx = create_test_context(75).await;
         let constraint = SizeConstraint::new(Assertion::Between(50.0, 100.0));
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(75.0));
     }
@@ -203,7 +207,9 @@ mod tests {
         let ctx = create_test_context(10).await;
         let constraint = SizeConstraint::new(Assertion::GreaterThan(50.0));
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert_eq!(result.metric, Some(10.0));
     }
@@ -213,7 +219,9 @@ mod tests {
         let ctx = create_test_context(0).await;
         let constraint = SizeConstraint::new(Assertion::Equals(0.0));
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(0.0));
     }

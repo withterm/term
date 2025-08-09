@@ -211,14 +211,9 @@ impl DatabaseSource {
                 username,
                 password,
             } => {
-                let connection_string = format!(
-                    "mysql://{}:{}@{}:{}/{}",
-                    username,
-                    password.expose(),
-                    host,
-                    port,
-                    database
-                );
+                let password_str = password.expose();
+                let connection_string =
+                    format!("mysql://{username}:{password_str}@{host}:{port}/{database}");
                 let mut params = std::collections::HashMap::new();
                 params.insert("connection_string".to_string(), connection_string);
                 params.insert("sslmode".to_string(), "disabled".to_string());
@@ -323,10 +318,8 @@ impl super::DataSource for DatabaseSource {
                 database,
                 ..
             } => {
-                format!(
-                    "PostgreSQL table '{}' at {}:{}/{}",
-                    self.table_name, host, port, database
-                )
+                let table_name = &self.table_name;
+                format!("PostgreSQL table '{table_name}' at {host}:{port}/{database}")
             }
             #[cfg(feature = "mysql")]
             DatabaseConfig::MySQL {
@@ -335,10 +328,8 @@ impl super::DataSource for DatabaseSource {
                 database,
                 ..
             } => {
-                format!(
-                    "MySQL table '{}' at {}:{}/{}",
-                    self.table_name, host, port, database
-                )
+                let table_name = &self.table_name;
+                format!("MySQL table '{table_name}' at {host}:{port}/{database}")
             }
             #[cfg(feature = "sqlite")]
             DatabaseConfig::SQLite(path) => {

@@ -199,7 +199,7 @@ impl Analyzer for EntropyAnalyzer {
         // Get the table name from the validation context
         let validation_ctx = current_validation_context();
         let table_name = validation_ctx.table_name();
-        
+
         // First check if we have too many unique values
         let count_distinct_sql = format!(
             "SELECT COUNT(DISTINCT {0}) as unique_count FROM {table_name} WHERE {0} IS NOT NULL",
@@ -234,8 +234,6 @@ impl Analyzer for EntropyAnalyzer {
             let validation_ctx = current_validation_context();
 
             let table_name = validation_ctx.table_name();
-
-            
 
             let sql = format!(
                 "SELECT 

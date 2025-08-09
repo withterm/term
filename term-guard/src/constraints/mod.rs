@@ -108,6 +108,42 @@
 //! # }
 //! ```
 //!
+//! ### Cross-Table and Multi-Source Validation
+//!
+//! Term provides advanced capabilities for validating data across multiple tables:
+//!
+//! ```rust
+//! use term_guard::constraints::{CrossTableSumConstraint, ForeignKeyConstraint, JoinCoverageConstraint};
+//! use term_guard::core::MultiSourceValidator;
+//!
+//! # async fn example() -> term_guard::prelude::Result<()> {
+//! // Multi-source validation setup
+//! let mut validator = MultiSourceValidator::new("enterprise_validation");
+//! validator.register_source("orders", "Order transactions")?;
+//! validator.register_source("payments", "Payment records")?;
+//!
+//! // Cross-table sum validation
+//! validator.add_cross_table_validation(
+//!     "financial_consistency",
+//!     CrossTableSumConstraint::new("orders.total", "payments.amount")
+//!         .group_by(vec!["customer_id"])
+//!         .tolerance(0.01)
+//! )?;
+//!
+//! // Foreign key validation
+//! validator.add_foreign_key_validation(
+//!     "referential_integrity",
+//!     ForeignKeyConstraint::new("orders.customer_id", "customers.id")
+//! )?;
+//!
+//! // Join coverage analysis
+//! let coverage_constraint = JoinCoverageConstraint::new("customers", "orders")
+//!     .on_columns(vec!["id"], vec!["customer_id"])
+//!     .minimum_coverage(0.95);
+//! # Ok(())
+//! # }
+//! ```
+//!
 //! ### Custom Constraints
 //!
 //! For business-specific rules, use [`CustomSqlConstraint`]:
@@ -189,10 +225,13 @@ mod assertion;
 mod column_count;
 mod completeness;
 mod correlation;
+mod cross_table_sum;
 mod custom_sql;
 mod datatype;
+mod foreign_key;
 mod format;
 mod histogram;
+mod join_coverage;
 mod length;
 mod quantile;
 mod size;
@@ -206,13 +245,16 @@ pub use assertion::Assertion;
 pub use column_count::ColumnCountConstraint;
 pub use completeness::CompletenessConstraint;
 pub use correlation::{CorrelationConstraint, CorrelationType};
+pub use cross_table_sum::{CrossTableSumBuilder, CrossTableSumConstraint};
 pub use custom_sql::CustomSqlConstraint;
 pub use datatype::{
     DataTypeConstraint, DataTypeValidation, NumericValidation, StringTypeValidation,
     TemporalValidation,
 };
+pub use foreign_key::ForeignKeyConstraint;
 pub use format::{FormatConstraint, FormatOptions, FormatType};
 pub use histogram::{Histogram, HistogramAssertion, HistogramBucket, HistogramConstraint};
+pub use join_coverage::{CoverageDirection, JoinCoverageConstraint, JoinType};
 pub use length::{LengthAssertion, LengthConstraint};
 pub use quantile::{QuantileConstraint, QuantileMethod};
 pub use size::SizeConstraint;

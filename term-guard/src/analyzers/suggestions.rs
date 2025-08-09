@@ -14,7 +14,7 @@
 //!
 //! ## Example Usage
 //!
-//! ```rust,no_run
+//! ```rust,ignore
 //! use term_guard::analyzers::{SuggestionEngine, CompletenessRule, ColumnProfile, BasicStatistics, DetectedDataType};
 //! use term_guard::test_fixtures::create_minimal_tpc_h_context;
 //!

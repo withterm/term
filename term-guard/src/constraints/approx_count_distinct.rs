@@ -1,7 +1,9 @@
 //! Approximate count distinct validation constraint.
 
 use crate::constraints::Assertion;
-use crate::core::{current_validation_context, Constraint, ConstraintMetadata, ConstraintResult, ConstraintStatus};
+use crate::core::{
+    current_validation_context, Constraint, ConstraintMetadata, ConstraintResult, ConstraintStatus,
+};
 use crate::prelude::*;
 use async_trait::async_trait;
 use datafusion::prelude::*;
@@ -57,8 +59,6 @@ impl Constraint for ApproxCountDistinctConstraint {
         let validation_ctx = current_validation_context();
 
         let table_name = validation_ctx.table_name();
-
-        
 
         let sql = format!(
             "SELECT APPROX_DISTINCT({}) as approx_distinct_count FROM {table_name}",
@@ -195,7 +195,9 @@ mod tests {
 
         let constraint =
             ApproxCountDistinctConstraint::new("test_col", Assertion::GreaterThan(990.0));
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
 
         assert_eq!(result.status, ConstraintStatus::Success);
         // APPROX_DISTINCT should be close to 1000
@@ -214,7 +216,9 @@ mod tests {
         let ctx = create_test_context_with_data(values).await;
 
         let constraint = ApproxCountDistinctConstraint::new("test_col", Assertion::LessThan(10.0));
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
 
         assert_eq!(result.status, ConstraintStatus::Success);
         // Should be approximately 3
@@ -241,7 +245,9 @@ mod tests {
         // APPROX_DISTINCT should count distinct non-null values (approximately 3)
         let constraint =
             ApproxCountDistinctConstraint::new("test_col", Assertion::Between(2.0, 5.0));
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
 
         assert_eq!(result.status, ConstraintStatus::Success);
         let metric = result.metric.unwrap();
@@ -257,7 +263,9 @@ mod tests {
         // Expect high cardinality but data has low cardinality (~10 distinct values)
         let constraint =
             ApproxCountDistinctConstraint::new("test_col", Assertion::GreaterThan(100.0));
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
 
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert!(result.metric.unwrap() < 20.0);
@@ -281,7 +289,9 @@ mod tests {
         // Should have approximately 5 distinct non-null values
         let constraint =
             ApproxCountDistinctConstraint::new("test_col", Assertion::Between(4.0, 6.0));
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
 
         assert_eq!(result.status, ConstraintStatus::Success);
     }
@@ -292,7 +302,9 @@ mod tests {
 
         // APPROX_DISTINCT returns 0 for empty data, not skipped
         let constraint = ApproxCountDistinctConstraint::new("test_col", Assertion::Equals(0.0));
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
 
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(0.0));
@@ -305,7 +317,9 @@ mod tests {
 
         // APPROX_DISTINCT of all nulls should be 0
         let constraint = ApproxCountDistinctConstraint::new("test_col", Assertion::Equals(0.0));
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
 
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(0.0));
@@ -323,7 +337,9 @@ mod tests {
 
         let constraint =
             ApproxCountDistinctConstraint::new("test_col", Assertion::Between(970.0, 1030.0));
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
 
         assert_eq!(result.status, ConstraintStatus::Success);
         // Should be within 3% of 1000

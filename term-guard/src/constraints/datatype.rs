@@ -7,7 +7,9 @@
 //!
 //! And adds support for more complex type validations.
 
-use crate::core::{current_validation_context, Constraint, ConstraintMetadata, ConstraintResult, ConstraintStatus};
+use crate::core::{
+    current_validation_context, Constraint, ConstraintMetadata, ConstraintResult, ConstraintStatus,
+};
 use crate::prelude::*;
 use crate::security::SqlSecurity;
 use arrow::array::Array;
@@ -295,7 +297,7 @@ impl Constraint for DataTypeConstraint {
         // Get the table name from the validation context
         let validation_ctx = current_validation_context();
         let table_name = validation_ctx.table_name();
-        
+
         match &self.validation {
             DataTypeValidation::SpecificType(expected_type) => {
                 // Check the schema for the column type
@@ -488,12 +490,16 @@ mod tests {
 
         // Test correct type
         let constraint = DataTypeConstraint::specific_type("int_col", "Int64").unwrap();
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
 
         // Test incorrect type
         let constraint = DataTypeConstraint::specific_type("int_col", "Utf8").unwrap();
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
     }
 
@@ -529,12 +535,16 @@ mod tests {
 
         // Test all non-negative values
         let constraint = DataTypeConstraint::non_negative("positive_values").unwrap();
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
 
         // Test mixed values
         let constraint = DataTypeConstraint::non_negative("mixed_values").unwrap();
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert!(result.metric.unwrap() < 1.0);
     }
@@ -570,7 +580,9 @@ mod tests {
         )
         .unwrap();
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
     }
 
@@ -602,7 +614,9 @@ mod tests {
         )
         .unwrap();
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
         // 3 out of 4 non-null values are not empty (empty string counts as empty)
         assert!((result.metric.unwrap() - 0.75).abs() < 0.01);

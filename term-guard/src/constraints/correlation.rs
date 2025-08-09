@@ -300,7 +300,7 @@ impl Constraint for CorrelationConstraint {
         // Get the table name from the validation context
         let validation_ctx = current_validation_context();
         let table_name = validation_ctx.table_name();
-        
+
         match &self.validation {
             CorrelationValidation::Pairwise {
                 column1,
@@ -404,8 +404,6 @@ impl Constraint for CorrelationConstraint {
                 let validation_ctx = current_validation_context();
 
                 let table_name = validation_ctx.table_name();
-
-                
 
                 let sql = format!(
                     "SELECT ABS({}) as abs_corr FROM {table_name}",
@@ -592,7 +590,9 @@ mod tests {
         let constraint =
             CorrelationConstraint::pearson("x", "y", Assertion::GreaterThan(0.9)).unwrap();
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert!(result.metric.unwrap() > 0.9);
     }
@@ -603,7 +603,9 @@ mod tests {
 
         let constraint = CorrelationConstraint::independence("x", "y", 0.3).unwrap();
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         // Independent data should have low correlation
         assert_eq!(result.status, ConstraintStatus::Success);
     }
@@ -621,7 +623,9 @@ mod tests {
         })
         .unwrap();
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
     }
 

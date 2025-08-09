@@ -35,14 +35,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
         with:
           toolchain: ${{ matrix.rust }}
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ runner.os }}-${{ matrix.rust }}
+          cache-key: "cache-tests-${{ runner.os }}-${{ matrix.rust }}"
 
       - name: Run tests
         run: cargo test --all-features
@@ -60,10 +57,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
         with:
+          toolchain: stable
           components: rustfmt
+          cache-key: "cache-fmt"
 
       - name: Check formatting
         run: cargo fmt --all -- --check
@@ -75,12 +74,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
         with:
+          toolchain: stable
           components: clippy
-
-      - uses: Swatinem/rust-cache@v2
+          cache-key: "cache-clippy"
 
       - name: Run clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
@@ -92,10 +91,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+        with:
+          toolchain: stable
+          cache-key: "cache-coverage"
 
       - name: Install tarpaulin
         run: cargo install cargo-tarpaulin
@@ -117,10 +117,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install MSRV toolchain
-        uses: dtolnay/rust-toolchain@1.70.0
-
-      - uses: Swatinem/rust-cache@v2
+      - name: Setup Rust (MSRV)
+        uses: ./.github/actions/setup-rust
+        with:
+          toolchain: 1.70.0
+          cache-key: "cache-msrv"
 
       - name: Check MSRV
         run: cargo check --all-features
@@ -132,10 +133,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+        with:
+          toolchain: stable
+          cache-key: "cache-build"
 
       - name: Build
         run: cargo build --release --all-features
@@ -150,10 +152,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+        with:
+          toolchain: stable
+          cache-key: "cache-integration"
 
       - name: Run integration tests
         run: cargo integration

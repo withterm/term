@@ -106,15 +106,9 @@ impl Constraint for DataTypeConstraint {
 
         // Get the table name from the validation context
 
-
         let validation_ctx = current_validation_context();
 
-
         let table_name = validation_ctx.table_name();
-
-
-        
-
 
         let sql = format!(
             "SELECT 
@@ -239,7 +233,7 @@ impl Constraint for ContainmentConstraint {
         // Get the table name from the validation context
         let validation_ctx = current_validation_context();
         let table_name = validation_ctx.table_name();
-        
+
         // Create IN clause with allowed values
         let values_list = self
             .allowed_values
@@ -364,7 +358,7 @@ impl Constraint for NonNegativeConstraint {
         // Get the table name from the validation context
         let validation_ctx = current_validation_context();
         let table_name = validation_ctx.table_name();
-        
+
         // Check if all values are >= 0
         let sql = format!(
             "SELECT 
@@ -490,7 +484,9 @@ mod tests {
 
         let constraint = DataTypeConstraint::new("text_col", DataType::Integer, 0.7);
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(0.75)); // 3 out of 4 are integers
     }
@@ -502,7 +498,9 @@ mod tests {
 
         let constraint = DataTypeConstraint::new("text_col", DataType::Float, 0.7);
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(0.75)); // 3 out of 4 are floats
     }
@@ -514,7 +512,9 @@ mod tests {
 
         let constraint = DataTypeConstraint::new("text_col", DataType::Boolean, 0.7);
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(0.75)); // 3 out of 4 are booleans
     }
@@ -534,7 +534,9 @@ mod tests {
             vec!["active", "inactive", "pending", "archived"],
         );
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert_eq!(result.metric, Some(0.75)); // 3 out of 4 are in allowed set
     }
@@ -549,7 +551,9 @@ mod tests {
             vec!["active", "inactive", "pending", "archived"],
         );
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(1.0)); // All values are in allowed set
     }
@@ -561,7 +565,9 @@ mod tests {
 
         let constraint = NonNegativeConstraint::new("num_col");
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(1.0)); // All values are non-negative
     }
@@ -573,7 +579,9 @@ mod tests {
 
         let constraint = NonNegativeConstraint::new("num_col");
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert_eq!(result.metric, Some(0.75)); // 3 out of 4 are non-negative
     }
@@ -585,7 +593,9 @@ mod tests {
 
         let constraint = ContainmentConstraint::new("text_col", vec!["active", "inactive"]);
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(1.0)); // All non-null values are valid
     }

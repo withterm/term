@@ -252,8 +252,6 @@ impl UnifiedCompletenessBase {
 
         let table_name = validation_ctx.table_name();
 
-        
-
         let sql = format!(
             "SELECT 
                 COUNT(*) as total_count,

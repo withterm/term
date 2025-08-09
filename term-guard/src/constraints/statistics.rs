@@ -260,8 +260,6 @@ impl Constraint for StatisticalConstraint {
 
         let table_name = validation_ctx.table_name();
 
-        
-
         let sql = format!("SELECT {stat_expr} as stat_value FROM {table_name}");
 
         let df = ctx.sql(&sql).await?;
@@ -438,11 +436,11 @@ impl Constraint for MultiStatisticalConstraint {
             .collect();
 
         let parts = sql_parts.join(", ");
-                // Get the table name from the validation context
+        // Get the table name from the validation context
         let validation_ctx = current_validation_context();
         let table_name = validation_ctx.table_name();
 
-let sql = format!("SELECT {parts} FROM {table_name}");
+        let sql = format!("SELECT {parts} FROM {table_name}");
 
         let df = ctx.sql(&sql).await?;
         let batches = df.collect().await?;
@@ -567,7 +565,9 @@ mod tests {
         let ctx = create_test_context(vec![Some(10.0), Some(20.0), Some(30.0)]).await;
         let constraint = StatisticalConstraint::mean("value", Assertion::Equals(20.0)).unwrap();
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(20.0));
     }
@@ -577,12 +577,16 @@ mod tests {
         let ctx = create_test_context(vec![Some(5.0), Some(10.0), Some(15.0)]).await;
 
         let min_constraint = StatisticalConstraint::min("value", Assertion::Equals(5.0)).unwrap();
-        let result = evaluate_constraint_with_context(&min_constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&min_constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(5.0));
 
         let max_constraint = StatisticalConstraint::max("value", Assertion::Equals(15.0)).unwrap();
-        let result = evaluate_constraint_with_context(&max_constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&max_constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(15.0));
     }
@@ -592,7 +596,9 @@ mod tests {
         let ctx = create_test_context(vec![Some(10.0), Some(20.0), Some(30.0)]).await;
         let constraint = StatisticalConstraint::sum("value", Assertion::Equals(60.0)).unwrap();
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(60.0));
     }
@@ -602,7 +608,9 @@ mod tests {
         let ctx = create_test_context(vec![Some(10.0), None, Some(20.0)]).await;
         let constraint = StatisticalConstraint::mean("value", Assertion::Equals(15.0)).unwrap();
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(15.0));
     }
@@ -612,7 +620,9 @@ mod tests {
         let ctx = create_test_context(vec![None, None, None]).await;
         let constraint = StatisticalConstraint::mean("value", Assertion::Equals(0.0)).unwrap();
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert!(result.message.unwrap().contains("null"));
     }
@@ -643,7 +653,9 @@ mod tests {
         )
         .unwrap();
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
     }
 
@@ -660,7 +672,9 @@ mod tests {
         )
         .unwrap();
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert!(result.message.unwrap().contains("minimum is 10"));
     }

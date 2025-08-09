@@ -153,7 +153,7 @@ impl UnifiedConstraint for CompletenessConstraint {
         // Get the table name from the validation context
         let validation_ctx = current_validation_context();
         let table_name = validation_ctx.table_name();
-        
+
         // Build SQL query to calculate completeness
         let sql = format!(
             "SELECT 
@@ -346,7 +346,9 @@ mod tests {
 
         let constraint = CompletenessConstraint::complete("id");
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(1.0));
     }
@@ -367,7 +369,9 @@ mod tests {
 
         let constraint = CompletenessConstraint::with_threshold("email", 0.8);
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(0.8)); // 4 out of 5
     }
@@ -382,7 +386,9 @@ mod tests {
 
         let constraint = CompletenessConstraint::with_threshold("phone", 0.8);
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert_eq!(result.metric, Some(0.5)); // 2 out of 4
         assert!(result.message.is_some());
@@ -408,7 +414,9 @@ mod tests {
                 .with_threshold(1.0),
         );
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(1.0));
     }
@@ -432,7 +440,9 @@ mod tests {
                 .with_threshold(1.0),
         );
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert!(result.message.is_some());
         assert!(result.message.unwrap().contains("col2"));
@@ -456,7 +466,9 @@ mod tests {
             0.3, // 30% complete
         );
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         // phone: 1/3 = 0.33, email: 1/3 = 0.33, address: 0/3 = 0
         // At least one column (phone and email) meets the 30% threshold
@@ -483,7 +495,9 @@ mod tests {
             0.8,
         );
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
         // 2 columns (col1 and col2) are >= 80% complete
     }
@@ -508,7 +522,9 @@ mod tests {
             1.0,
         );
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Success);
     }
 
@@ -517,7 +533,9 @@ mod tests {
         let ctx = create_test_context(vec!["id"], vec![]).await;
         let constraint = CompletenessConstraint::complete("id");
 
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
         assert_eq!(result.status, ConstraintStatus::Skipped);
     }
 

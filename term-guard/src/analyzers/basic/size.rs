@@ -77,7 +77,7 @@ impl Analyzer for SizeAnalyzer {
         // Get the table name from the validation context
         let validation_ctx = current_validation_context();
         let table_name = validation_ctx.table_name();
-        
+
         // Execute count query
         let sql = format!("SELECT COUNT(*) as count FROM {table_name}");
         let df = ctx.sql(&sql).await?;

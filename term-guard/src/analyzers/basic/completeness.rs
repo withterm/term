@@ -103,8 +103,6 @@ impl Analyzer for CompletenessAnalyzer {
 
         let table_name = validation_ctx.table_name();
 
-        
-
         let sql = format!(
             "SELECT COUNT(*) as total_count, COUNT({}) as non_null_count FROM {table_name}",
             self.column

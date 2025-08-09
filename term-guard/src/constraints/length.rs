@@ -160,15 +160,9 @@ impl Constraint for LengthConstraint {
 
         // Get the table name from the validation context
 
-
         let validation_ctx = current_validation_context();
 
-
         let table_name = validation_ctx.table_name();
-
-
-        
-
 
         let sql = format!(
             "SELECT 
@@ -263,7 +257,9 @@ mod tests {
         .await;
 
         let constraint = LengthConstraint::min("text", 5);
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
 
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(1.0)); // All values meet criteria
@@ -282,7 +278,9 @@ mod tests {
         .await;
 
         let constraint = LengthConstraint::min("text", 5);
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
 
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert_eq!(result.metric, Some(0.6)); // 3/5 values meet criteria
@@ -294,7 +292,9 @@ mod tests {
         let ctx = create_test_context(vec![Some("hi"), Some("hey"), Some("test"), None]).await;
 
         let constraint = LengthConstraint::max("text", 10);
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
 
         assert_eq!(result.status, ConstraintStatus::Success);
         assert_eq!(result.metric, Some(1.0));
@@ -312,7 +312,9 @@ mod tests {
         .await;
 
         let constraint = LengthConstraint::max("text", 10);
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
 
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert_eq!(result.metric, Some(0.75)); // 3/4 values meet criteria
@@ -331,7 +333,9 @@ mod tests {
         .await;
 
         let constraint = LengthConstraint::between("text", 3, 10);
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
 
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert_eq!(result.metric, Some(0.6)); // 3/5 values meet criteria (2 within range + 1 NULL)
@@ -354,7 +358,9 @@ mod tests {
         .await;
 
         let constraint = LengthConstraint::exactly("text", 5);
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
 
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert_eq!(result.metric, Some(0.6)); // 3/5 values meet criteria (2 exact + 1 NULL)
@@ -374,7 +380,9 @@ mod tests {
         .await;
 
         let constraint = LengthConstraint::not_empty("text");
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
 
         assert_eq!(result.status, ConstraintStatus::Failure);
         assert_eq!(result.metric, Some(0.8)); // 4/5 values meet criteria
@@ -395,7 +403,9 @@ mod tests {
 
         // DataFusion's LENGTH function counts characters, not bytes
         let constraint = LengthConstraint::min("text", 2);
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
 
         assert_eq!(result.status, ConstraintStatus::Success);
         // All non-null values have at least 2 characters
@@ -406,7 +416,9 @@ mod tests {
         let ctx = create_test_context(vec![None, None, None]).await;
 
         let constraint = LengthConstraint::min("text", 5);
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
 
         // All NULL values should be considered as meeting the constraint
         assert_eq!(result.status, ConstraintStatus::Success);
@@ -418,7 +430,9 @@ mod tests {
         let ctx = create_test_context(vec![]).await;
 
         let constraint = LengthConstraint::min("text", 5);
-        let result = evaluate_constraint_with_context(&constraint, &ctx, "data").await.unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
 
         assert_eq!(result.status, ConstraintStatus::Skipped);
     }

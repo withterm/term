@@ -100,8 +100,6 @@ impl Analyzer for MeanAnalyzer {
 
         let table_name = validation_ctx.table_name();
 
-        
-
         let sql = format!(
             "SELECT SUM({0}) as sum, COUNT({0}) as count FROM {table_name}",
             self.column

@@ -1,0 +1,31 @@
+name: "Setup Rust"
+description: "Install Rust toolchain with Blacksmith-optimized caching"
+inputs:
+  toolchain:
+    description: "Rust toolchain to use (e.g., stable, 1.70.0)"
+    required: false
+    default: "stable"
+  components:
+    description: "Rust components to install (e.g., rustfmt, clippy)"
+    required: false
+    default: ""
+  cache-key:
+    description: "Cache namespace for different job types"
+    required: false
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Rust toolchain
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{ inputs.toolchain }}
+        components: ${{ inputs.components }}
+
+    - name: Cache Rust dependencies
+      uses: Swatinem/rust-cache@v2
+      with:
+        prefix-key: "v1-rust"
+        shared-key: ${{ inputs.cache-key }}
+        cache-on-failure: true
