@@ -1,6 +1,6 @@
 //! Benchmarks for TypeInferenceEngine performance validation.
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use std::time::Duration;
 use term_guard::analyzers::inference::{TypeInferenceEngine, TypeStats};
 use term_guard::test_fixtures::create_minimal_tpc_h_context;
@@ -34,9 +34,9 @@ fn bench_single_column_inference(c: &mut Criterion) {
             |b, &column| {
                 b.iter(|| {
                     rt.block_on(engine.infer_column_type(
-                        black_box(&ctx),
-                        black_box("lineitem"),
-                        black_box(column),
+                        std::hint::black_box(&ctx),
+                        std::hint::black_box("lineitem"),
+                        std::hint::black_box(column),
                     ))
                 });
             },
@@ -66,9 +66,9 @@ fn bench_sample_size_performance(c: &mut Criterion) {
             |b, engine| {
                 b.iter(|| {
                     rt.block_on(engine.infer_column_type(
-                        black_box(&ctx),
-                        black_box("lineitem"),
-                        black_box("l_extendedprice"),
+                        std::hint::black_box(&ctx),
+                        std::hint::black_box("lineitem"),
+                        std::hint::black_box("l_extendedprice"),
                     ))
                 });
             },
@@ -98,9 +98,9 @@ fn bench_confidence_threshold_impact(c: &mut Criterion) {
             |b, engine| {
                 b.iter(|| {
                     rt.block_on(engine.infer_column_type(
-                        black_box(&ctx),
-                        black_box("lineitem"),
-                        black_box("l_quantity"),
+                        std::hint::black_box(&ctx),
+                        std::hint::black_box("lineitem"),
+                        std::hint::black_box("l_quantity"),
                     ))
                 });
             },
@@ -151,9 +151,9 @@ fn bench_multiple_column_inference(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("parallel", name), columns, |b, columns| {
             b.iter(|| {
                 rt.block_on(engine.infer_multiple_columns(
-                    black_box(&ctx),
-                    black_box("lineitem"),
-                    black_box(columns),
+                    std::hint::black_box(&ctx),
+                    std::hint::black_box("lineitem"),
+                    std::hint::black_box(columns),
                 ))
             });
         });
@@ -182,9 +182,9 @@ fn bench_categorical_threshold_impact(c: &mut Criterion) {
             |b, engine| {
                 b.iter(|| {
                     rt.block_on(engine.infer_column_type(
-                        black_box(&ctx),
-                        black_box("lineitem"),
-                        black_box("l_comment"),
+                        std::hint::black_box(&ctx),
+                        std::hint::black_box("lineitem"),
+                        std::hint::black_box("l_comment"),
                     ))
                 });
             },
@@ -215,9 +215,9 @@ fn bench_decimal_precision_detection(c: &mut Criterion) {
             |b, engine| {
                 b.iter(|| {
                     rt.block_on(engine.infer_column_type(
-                        black_box(&ctx),
-                        black_box("lineitem"),
-                        black_box("l_extendedprice"),
+                        std::hint::black_box(&ctx),
+                        std::hint::black_box("lineitem"),
+                        std::hint::black_box("l_extendedprice"),
                     ))
                 });
             },
@@ -251,9 +251,9 @@ fn bench_international_formats(c: &mut Criterion) {
             |b, engine| {
                 b.iter(|| {
                     rt.block_on(engine.infer_column_type(
-                        black_box(&ctx),
-                        black_box("lineitem"),
-                        black_box("l_shipdate"),
+                        std::hint::black_box(&ctx),
+                        std::hint::black_box("lineitem"),
+                        std::hint::black_box("l_shipdate"),
                     ))
                 });
             },
@@ -288,7 +288,10 @@ fn bench_pattern_matching_performance(c: &mut Criterion) {
             |b, &value| {
                 b.iter(|| {
                     let mut stats = TypeStats::new();
-                    engine.test_patterns(black_box(value), black_box(&mut stats));
+                    engine.test_patterns(
+                        std::hint::black_box(value),
+                        std::hint::black_box(&mut stats),
+                    );
                 });
             },
         );
@@ -317,7 +320,7 @@ fn bench_type_determination(c: &mut Criterion) {
             BenchmarkId::new("determination", name),
             &stats,
             |b, stats| {
-                b.iter(|| engine.determine_type(black_box(stats)));
+                b.iter(|| engine.determine_type(std::hint::black_box(stats)));
             },
         );
     }

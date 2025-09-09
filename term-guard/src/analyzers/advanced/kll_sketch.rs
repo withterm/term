@@ -81,7 +81,7 @@ impl Compactor {
         #[cfg(feature = "test-utils")]
         {
             use rand::Rng;
-            rand::thread_rng().gen_bool(0.5)
+            rand::rng().random_bool(0.5)
         }
 
         #[cfg(not(feature = "test-utils"))]

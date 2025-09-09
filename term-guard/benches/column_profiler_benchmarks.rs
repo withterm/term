@@ -1,6 +1,6 @@
 //! Benchmarks for ColumnProfiler performance validation.
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use std::time::Duration;
 use term_guard::analyzers::ColumnProfiler;
 use term_guard::test_fixtures::create_minimal_tpc_h_context;
@@ -34,9 +34,9 @@ fn bench_single_column_profiling(c: &mut Criterion) {
             |b, &column| {
                 b.iter(|| {
                     rt.block_on(profiler.profile_column(
-                        black_box(&ctx),
-                        black_box("lineitem"),
-                        black_box(column),
+                        std::hint::black_box(&ctx),
+                        std::hint::black_box("lineitem"),
+                        std::hint::black_box(column),
                     ))
                 });
             },
@@ -89,9 +89,9 @@ fn bench_profiler_configurations(c: &mut Criterion) {
             |b, profiler| {
                 b.iter(|| {
                     rt.block_on(profiler.profile_column(
-                        black_box(&ctx),
-                        black_box("lineitem"),
-                        black_box("l_extendedprice"),
+                        std::hint::black_box(&ctx),
+                        std::hint::black_box("lineitem"),
+                        std::hint::black_box("l_extendedprice"),
                     ))
                 });
             },
@@ -146,9 +146,9 @@ fn bench_multiple_columns(c: &mut Criterion) {
             |b, columns| {
                 b.iter(|| {
                     rt.block_on(profiler_seq.profile_columns(
-                        black_box(&ctx),
-                        black_box("lineitem"),
-                        black_box(columns),
+                        std::hint::black_box(&ctx),
+                        std::hint::black_box("lineitem"),
+                        std::hint::black_box(columns),
                     ))
                 });
             },
@@ -159,9 +159,9 @@ fn bench_multiple_columns(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("parallel", name), columns, |b, columns| {
             b.iter(|| {
                 rt.block_on(profiler_par.profile_columns(
-                    black_box(&ctx),
-                    black_box("lineitem"),
-                    black_box(columns),
+                    std::hint::black_box(&ctx),
+                    std::hint::black_box("lineitem"),
+                    std::hint::black_box(columns),
                 ))
             });
         });
@@ -200,9 +200,9 @@ fn bench_three_pass_algorithm(c: &mut Criterion) {
                 ];
                 b.iter(|| {
                     rt.block_on(profiler.profile_columns(
-                        black_box(&ctx),
-                        black_box("lineitem"),
-                        black_box(&columns),
+                        std::hint::black_box(&ctx),
+                        std::hint::black_box("lineitem"),
+                        std::hint::black_box(&columns),
                     ))
                 });
             },

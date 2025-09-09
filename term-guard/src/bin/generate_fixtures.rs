@@ -18,10 +18,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Generate fixtures for different scale factors
     for scale in [ScaleFactor::SF01, ScaleFactor::SF1] {
-        println!("Generating fixtures for scale {:?}", scale);
+        println!("Generating fixtures for scale {scale:?}");
         let ctx = create_tpc_h_context(scale).await?;
 
-        let scale_dir = fixtures_dir.join(format!("{:?}", scale).to_lowercase());
+        let scale_dir = fixtures_dir.join(format!("{scale:?}").to_lowercase());
         std::fs::create_dir_all(&scale_dir)?;
 
         // Save each table as Parquet
@@ -31,13 +31,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let table = match ctx.table(table_name).await {
                 Ok(t) => t,
                 Err(_) => {
-                    println!("  Skipping {} (not found)", table_name);
+                    println!("  Skipping {table_name} (not found)");
                     continue;
                 }
             };
 
-            let output_path = scale_dir.join(format!("{}.parquet", table_name));
-            println!("  Writing {} to {:?}", table_name, output_path);
+            let output_path = scale_dir.join(format!("{table_name}.parquet"));
+            println!("  Writing {table_name} to {output_path:?}");
 
             // Collect to DataFrame and write to Parquet
             let df = table.collect().await?;

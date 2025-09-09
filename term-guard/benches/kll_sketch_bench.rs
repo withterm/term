@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use term_guard::analyzers::advanced::kll_sketch::KllSketch;
 
 fn benchmark_kll_sketch_update(c: &mut Criterion) {
@@ -15,7 +15,7 @@ fn benchmark_kll_sketch_update(c: &mut Criterion) {
                     b.iter(|| {
                         let mut sketch = KllSketch::new(k);
                         for i in 0..n {
-                            sketch.update(black_box(i as f64));
+                            sketch.update(std::hint::black_box(i as f64));
                         }
                         sketch
                     });
@@ -53,9 +53,9 @@ fn benchmark_kll_sketch_quantile(c: &mut Criterion) {
                 let sketch = &sketches[sketch_idx];
                 b.iter(|| {
                     // Test multiple quantiles
-                    let q50 = sketch.get_quantile(black_box(0.5)).unwrap();
-                    let q90 = sketch.get_quantile(black_box(0.9)).unwrap();
-                    let q99 = sketch.get_quantile(black_box(0.99)).unwrap();
+                    let q50 = sketch.get_quantile(std::hint::black_box(0.5)).unwrap();
+                    let q90 = sketch.get_quantile(std::hint::black_box(0.9)).unwrap();
+                    let q99 = sketch.get_quantile(std::hint::black_box(0.99)).unwrap();
                     (q50, q90, q99)
                 });
             },
@@ -116,7 +116,7 @@ fn benchmark_kll_sketch_memory_usage(c: &mut Criterion) {
 
                         // Sample memory usage every 10k updates
                         if i % 10_000 == 0 {
-                            black_box(sketch.memory_usage());
+                            std::hint::black_box(sketch.memory_usage());
                         }
                     }
 
@@ -187,7 +187,7 @@ fn benchmark_kll_sketch_compaction_overhead(c: &mut Criterion) {
                     |mut sketch| {
                         // Add data that will trigger multiple compactions
                         for i in 0..200_000 {
-                            sketch.update(black_box((i as f64) % 1000.0));
+                            sketch.update(std::hint::black_box((i as f64) % 1000.0));
                         }
                         sketch
                     },
@@ -211,7 +211,7 @@ fn benchmark_kll_sketch_random_vs_deterministic(c: &mut Criterion) {
         b.iter(|| {
             let mut sketch = KllSketch::new(k);
             for i in 0..n {
-                sketch.update(black_box(i as f64));
+                sketch.update(std::hint::black_box(i as f64));
             }
             sketch.get_quantile(0.5).unwrap()
         });
@@ -222,7 +222,7 @@ fn benchmark_kll_sketch_random_vs_deterministic(c: &mut Criterion) {
         b.iter(|| {
             let mut sketch = KllSketch::new(k);
             for i in 0..n {
-                sketch.update(black_box(i as f64));
+                sketch.update(std::hint::black_box(i as f64));
             }
             sketch.get_quantile(0.5).unwrap()
         });

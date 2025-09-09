@@ -380,8 +380,8 @@ impl Constraint for ForeignKeyConstraint {
         // Format error message
         let message = if violation_examples.is_empty() {
             format!(
-                "Foreign key constraint violation: {total_violations} values in '{}' do not exist in '{}' (total: {total_violations}, unique: {unique_violations})",
-                self.child_column, self.parent_column
+                "Foreign key constraint violation: {} values in '{}' do not exist in '{}' (total: {}, unique: {})",
+                total_violations, self.child_column, self.parent_column, total_violations, unique_violations
             )
         } else {
             let examples_str = if violation_examples.len() <= 5 {
@@ -395,8 +395,8 @@ impl Constraint for ForeignKeyConstraint {
             };
 
             format!(
-                "Foreign key constraint violation: {total_violations} values in '{}' do not exist in '{}' (total: {total_violations}, unique: {unique_violations}). Examples: [{examples_str}]",
-                self.child_column, self.parent_column
+                "Foreign key constraint violation: {} values in '{}' do not exist in '{}' (total: {}, unique: {}). Examples: [{}]",
+                total_violations, self.child_column, self.parent_column, total_violations, unique_violations, examples_str
             )
         };
 
