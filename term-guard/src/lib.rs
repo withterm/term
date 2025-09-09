@@ -173,6 +173,7 @@ pub mod formatters;
 pub mod logging;
 pub mod optimizer;
 pub mod prelude;
+pub mod repository;
 pub mod security;
 pub mod sources;
 pub mod telemetry;
@@ -182,6 +183,9 @@ pub mod test_helpers;
 
 #[cfg(any(test, feature = "test-utils"))]
 pub mod test_utils;
+
+#[cfg(test)]
+pub mod test_utils_cached;
 
 #[cfg(any(test, feature = "test-utils"))]
 pub mod test_fixtures;

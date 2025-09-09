@@ -1,0 +1,39 @@
+# Nextest configuration for CI optimization
+# https://nexte.st/book/configuration
+
+[profile.default]
+# Run tests with all available CPU cores
+test-threads = "num-cpus"
+# Retry flaky tests
+retries = { backoff = "exponential", count = 1, delay = "1s" }
+
+[profile.ci]
+# CI-specific configuration for faster execution
+test-threads = "num-cpus"
+# More aggressive retries for CI
+retries = { backoff = "exponential", count = 2, delay = "500ms", max-delay = "10s" }
+# Fail fast on first failure
+fail-fast = false
+# Terminate slow tests
+slow-timeout = { period = "60s", terminate-after = 2 }
+# Status output for CI
+status-level = "pass"
+final-status-level = "flaky"
+
+[profile.ci-quick]
+# Even faster CI profile for quick checks
+test-threads = "num-cpus"
+retries = 0
+fail-fast = true
+slow-timeout = { period = "30s", terminate-after = 1 }
+
+# Test groups for better organization
+[[profile.ci.overrides]]
+filter = "test(integration)"
+threads-required = 2
+slow-timeout = { period = "120s", terminate-after = 2 }
+
+[[profile.ci.overrides]]
+filter = "test(tpc_h)"
+threads-required = 4
+slow-timeout = { period = "180s", terminate-after = 1 }

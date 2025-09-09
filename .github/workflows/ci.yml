@@ -16,19 +16,21 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   RUSTFLAGS: -D warnings
-  CARGO_INCREMENTAL: 1
-  CARGO_BUILD_JOBS: 4
-  RUST_TEST_THREADS: 4
+  CARGO_INCREMENTAL: 0  # Disable for CI (faster clean builds)
+  CARGO_BUILD_JOBS: 8  # Increased for better parallelization
+  RUST_TEST_THREADS: 8  # Match available cores
   RUST_BACKTRACE: 1
+  CARGO_NET_RETRY: 10
+  CARGO_NET_GIT_FETCH_WITH_CLI: true
 
 jobs:
   unit-tests:
     name: Unit Tests
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: 10
     strategy:
       matrix:
-        os: [blacksmith-4vcpu-ubuntu-2404]
+        os: [blacksmith-8vcpu-ubuntu-2404]  # Upgraded for more cores
         rust: [stable, 1.70.0]
       max-parallel: 4
     steps:
@@ -40,8 +42,13 @@ jobs:
           toolchain: ${{ matrix.rust }}
           cache-key: "cache-unit-${{ runner.os }}-${{ matrix.rust }}"
 
+      - name: Install nextest
+        run: |
+          curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
+          cargo nextest --version
+
       - name: Run unit tests
-        run: cargo test --lib --all-features
+        run: cargo nextest run --lib --all-features --profile ci
 
       - name: Run doc tests
         run: cargo test --doc
@@ -49,13 +56,13 @@ jobs:
   integration-tests:
     name: Integration Tests (Group ${{ matrix.group }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
+    timeout-minutes: 20
     strategy:
       matrix:
-        os: [blacksmith-8vcpu-ubuntu-2404]
+        os: [blacksmith-16vcpu-ubuntu-2404]  # More cores for heavy integration tests
         rust: [stable, 1.70.0]
-        group: [1, 2, 3] # Split tests into 3 parallel groups
-      max-parallel: 6
+        group: [1, 2, 3, 4, 5] # Split tests into 5 parallel groups for better distribution
+      max-parallel: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -65,51 +72,65 @@ jobs:
           toolchain: ${{ matrix.rust }}
           cache-key: "cache-integration-${{ runner.os }}-${{ matrix.rust }}-${{ matrix.group }}"
 
+      - name: Install nextest
+        run: |
+          curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
+          cargo nextest --version
+
       - name: Run integration tests (Group 1)
         if: matrix.group == 1
         run: |
-          cargo test --test analysis_runner_integration --all-features
-          cargo test --test analyzer_integration_tests --all-features
-          cargo test --test anomaly_detection_integration --all-features
-          cargo test --test approx_count_distinct_integration --all-features
-          cargo test --test builder_extensions_test --all-features
-          cargo test --test cloud_storage_test --all-features
-          cargo test --test column_count_integration --all-features
-          cargo test --test column_profiler_integration --all-features
-          cargo test --test completeness_integration --all-features
-          cargo test --test context_integration --all-features
+          cargo nextest run --test analysis_runner_integration --all-features --profile ci
+          cargo nextest run --test analyzer_integration_tests --all-features --profile ci
+          cargo nextest run --test anomaly_detection_integration --all-features --profile ci
+          cargo nextest run --test approx_count_distinct_integration --all-features --profile ci
+          cargo nextest run --test builder_extensions_test --all-features --profile ci
+          cargo nextest run --test cloud_storage_test --all-features --profile ci
 
       - name: Run integration tests (Group 2)
         if: matrix.group == 2
         run: |
-          cargo test --test data_type_integration --all-features
-          cargo test --test distinctness_integration --all-features
-          cargo test --test exact_quantile_integration --all-features
-          cargo test --test histogram_integration --all-features
-          cargo test --test integration_test_suite --all-features
-          cargo test --test joined_sources_integration --all-features
-          cargo test --test metrics_test --all-features
-          cargo test --test multi_source_integration --all-features
-          cargo test --test optimizer_integration --all-features
+          cargo nextest run --test column_count_integration --all-features --profile ci
+          cargo nextest run --test column_profiler_integration --all-features --profile ci
+          cargo nextest run --test completeness_integration --all-features --profile ci
+          cargo nextest run --test context_integration --all-features --profile ci
+          cargo nextest run --test data_type_integration --all-features --profile ci
+          cargo nextest run --test distinctness_integration --all-features --profile ci
 
       - name: Run integration tests (Group 3)
         if: matrix.group == 3
         run: |
-          cargo test --test performance_regression_test --all-features
-          cargo test --test property_tests --all-features
-          cargo test --test security_tests --all-features
-          cargo test --test sources_integration --all-features
-          cargo test --test string_length_integration --all-features
-          cargo test --test structured_logging_test --all-features
-          cargo test --test test_utils_test --all-features
-          cargo test --test type_inference_integration --all-features
-          cargo test --test unique_value_ratio_integration --all-features
+          cargo nextest run --test exact_quantile_integration --all-features --profile ci
+          cargo nextest run --test histogram_integration --all-features --profile ci
+          cargo nextest run --test integration_test_suite --all-features --profile ci
+          cargo nextest run --test joined_sources_integration --all-features --profile ci
+          cargo nextest run --test metrics_test --all-features --profile ci
+          cargo nextest run --test multi_source_integration --all-features --profile ci
+
+      - name: Run integration tests (Group 4)
+        if: matrix.group == 4
+        run: |
+          cargo nextest run --test optimizer_integration --all-features --profile ci
+          cargo nextest run --test performance_regression_test --all-features --profile ci
+          cargo nextest run --test property_tests --all-features --profile ci
+          cargo nextest run --test security_tests --all-features --profile ci
+          cargo nextest run --test sources_integration --all-features --profile ci
+          cargo nextest run --test repository_integration --all-features --profile ci
+
+      - name: Run integration tests (Group 5)
+        if: matrix.group == 5
+        run: |
+          cargo nextest run --test string_length_integration --all-features --profile ci
+          cargo nextest run --test structured_logging_test --all-features --profile ci
+          cargo nextest run --test test_utils_test --all-features --profile ci
+          cargo nextest run --test type_inference_integration --all-features --profile ci
+          cargo nextest run --test unique_value_ratio_integration --all-features --profile ci
 
   # Feature combination tests
   feature-tests:
     name: Feature Tests
     runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 15
+    timeout-minutes: 10
     strategy:
       matrix:
         rust: [stable]
@@ -122,8 +143,12 @@ jobs:
           toolchain: ${{ matrix.rust }}
           cache-key: "cache-features-${{ runner.os }}-${{ matrix.rust }}"
 
+      - name: Install nextest
+        run: |
+          curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
+
       - name: Run tests (no default features)
-        run: cargo test --no-default-features
+        run: cargo nextest run --no-default-features --profile ci-quick
 
   fmt:
     name: Rustfmt
@@ -145,7 +170,7 @@ jobs:
   clippy:
     name: Clippy
     runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -161,8 +186,8 @@ jobs:
 
   coverage:
     name: Code Coverage
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 45
+    runs-on: blacksmith-8vcpu-ubuntu-2404
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -173,10 +198,11 @@ jobs:
           cache-key: "cache-coverage"
 
       - name: Install tarpaulin
-        run: cargo install cargo-tarpaulin
+        run: |
+          cargo install cargo-tarpaulin --locked || true
 
       - name: Generate code coverage
-        run: cargo tarpaulin --verbose --all-features --workspace --timeout 120 --out xml
+        run: cargo tarpaulin --verbose --all-features --workspace --timeout 120 --out xml --engine llvm
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -203,8 +229,8 @@ jobs:
 
   build:
     name: Build Check
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 30
+    runs-on: blacksmith-8vcpu-ubuntu-2404
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 

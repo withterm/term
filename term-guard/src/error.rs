@@ -92,6 +92,58 @@ pub enum TermError {
     /// Security-related error.
     #[error("Security error: {0}")]
     SecurityError(String),
+
+    /// Error from repository operations.
+    #[error("Repository error ({operation} on {repository_type}): {message}")]
+    Repository {
+        /// Type of repository (e.g., "in_memory", "filesystem", "s3")
+        repository_type: String,
+        /// Operation that failed (e.g., "save", "load", "delete", "query")
+        operation: String,
+        /// Detailed error message
+        message: String,
+        /// Optional underlying error
+        #[source]
+        source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    },
+
+    /// Error when a repository key is invalid or malformed.
+    #[error("Invalid repository key: {message}")]
+    InvalidRepositoryKey {
+        /// The invalid key that caused the error
+        key: String,
+        /// Detailed error message explaining why the key is invalid
+        message: String,
+    },
+
+    /// Error when repository query parameters are invalid.
+    #[error("Invalid repository query: {message}")]
+    InvalidRepositoryQuery {
+        /// Detailed error message describing the invalid query
+        message: String,
+        /// The query parameters that caused the error
+        query_info: String,
+    },
+
+    /// Error when a repository key collision is detected.
+    #[error("Repository key collision detected: {message}")]
+    RepositoryKeyCollision {
+        /// The key that caused the collision
+        key: String,
+        /// Detailed error message
+        message: String,
+    },
+
+    /// Error when repository validation fails.
+    #[error("Repository validation error: {message}")]
+    RepositoryValidation {
+        /// The field or component that failed validation
+        field: String,
+        /// Detailed error message
+        message: String,
+        /// The invalid value that caused the error
+        invalid_value: String,
+    },
 }
 
 /// A type alias for `Result<T, TermError>`.
@@ -152,6 +204,75 @@ impl TermError {
             source_type: source_type.into(),
             message: message.into(),
             source: Some(source),
+        }
+    }
+
+    /// Creates a new repository error.
+    pub fn repository(
+        repository_type: impl Into<String>,
+        operation: impl Into<String>,
+        message: impl Into<String>,
+    ) -> Self {
+        Self::Repository {
+            repository_type: repository_type.into(),
+            operation: operation.into(),
+            message: message.into(),
+            source: None,
+        }
+    }
+
+    /// Creates a new repository error with a source error.
+    pub fn repository_with_source(
+        repository_type: impl Into<String>,
+        operation: impl Into<String>,
+        message: impl Into<String>,
+        source: Box<dyn std::error::Error + Send + Sync>,
+    ) -> Self {
+        Self::Repository {
+            repository_type: repository_type.into(),
+            operation: operation.into(),
+            message: message.into(),
+            source: Some(source),
+        }
+    }
+
+    /// Creates a new invalid repository key error.
+    pub fn invalid_repository_key(key: impl Into<String>, message: impl Into<String>) -> Self {
+        Self::InvalidRepositoryKey {
+            key: key.into(),
+            message: message.into(),
+        }
+    }
+
+    /// Creates a new invalid repository query error.
+    pub fn invalid_repository_query(
+        message: impl Into<String>,
+        query_info: impl Into<String>,
+    ) -> Self {
+        Self::InvalidRepositoryQuery {
+            message: message.into(),
+            query_info: query_info.into(),
+        }
+    }
+
+    /// Creates a new repository key collision error.
+    pub fn repository_key_collision(key: impl Into<String>, message: impl Into<String>) -> Self {
+        Self::RepositoryKeyCollision {
+            key: key.into(),
+            message: message.into(),
+        }
+    }
+
+    /// Creates a new repository validation error.
+    pub fn repository_validation(
+        field: impl Into<String>,
+        message: impl Into<String>,
+        invalid_value: impl Into<String>,
+    ) -> Self {
+        Self::RepositoryValidation {
+            field: field.into(),
+            message: message.into(),
+            invalid_value: invalid_value.into(),
         }
     }
 
