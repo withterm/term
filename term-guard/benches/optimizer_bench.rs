@@ -1,6 +1,6 @@
 //! Benchmarks for the query optimizer.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 use datafusion::prelude::*;
 use term_guard::constraints::{
     Assertion, CompletenessConstraint, StatisticType, StatisticalConstraint,
@@ -147,7 +147,7 @@ fn benchmark_optimizer_vs_sequential(c: &mut Criterion) {
                         .build();
 
                     let result = suite.run(&ctx).await.unwrap();
-                    black_box(result);
+                    std::hint::black_box(result);
                 })
             });
         });
@@ -220,7 +220,7 @@ fn benchmark_optimizer_vs_sequential(c: &mut Criterion) {
                         .build();
 
                     let result = suite.run(&ctx).await.unwrap();
-                    black_box(result);
+                    std::hint::black_box(result);
                 })
             });
         });
@@ -272,7 +272,7 @@ fn benchmark_cache_impact(c: &mut Criterion) {
                     .build();
 
                 let result = suite.run(&ctx).await.unwrap();
-                black_box(result);
+                std::hint::black_box(result);
             })
         });
     });
@@ -355,7 +355,7 @@ fn benchmark_cache_impact(c: &mut Criterion) {
                     .build();
 
                 let result = suite.run(&ctx).await.unwrap();
-                black_box(result);
+                std::hint::black_box(result);
             })
         });
     });
@@ -390,7 +390,7 @@ fn benchmark_grouping_efficiency(c: &mut Criterion) {
                         .build();
 
                     let result = suite.run(&ctx).await.unwrap();
-                    black_box(result);
+                    std::hint::black_box(result);
                 })
             });
         });

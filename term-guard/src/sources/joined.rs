@@ -161,7 +161,7 @@ impl JoinedSource {
             format!("{}.{}", self.right_alias, self.join_condition.right_column)
         };
 
-        let on_clause = format!("ON {} = {}", left_col, right_col);
+        let on_clause = format!("ON {left_col} = {right_col}");
 
         let mut sql = format!(
             "CREATE OR REPLACE VIEW {table_name} AS SELECT * FROM {} {join_type_sql} {} {on_clause}",

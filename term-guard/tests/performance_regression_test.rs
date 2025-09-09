@@ -76,7 +76,7 @@ fn get_threshold_multiplier() -> f64 {
 /// Creates test data with specified number of rows
 async fn create_test_data(rows: usize) -> SessionContext {
     let ctx = SessionContext::new();
-    let mut rng = thread_rng();
+    let mut rng = rand::rng();
 
     let schema = Arc::new(Schema::new(vec![
         Field::new("id", DataType::Int64, false),
@@ -90,12 +90,12 @@ async fn create_test_data(rows: usize) -> SessionContext {
 
     for i in 0..rows {
         ids.push(i as i64);
-        values.push(if rng.gen_bool(0.95) {
-            Some(rng.gen_range(0.0..1000.0))
+        values.push(if rng.random_bool(0.95) {
+            Some(rng.random_range(0.0..1000.0))
         } else {
             None
         });
-        emails.push(if rng.gen_bool(0.95) {
+        emails.push(if rng.random_bool(0.95) {
             Some(format!("user{i}@example.com"))
         } else {
             None

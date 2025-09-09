@@ -6,7 +6,7 @@
 use arrow::array::{Float64Array, Int64Array, StringArray};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
-use criterion::{black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
 use datafusion::datasource::MemTable;
 use datafusion::prelude::*;
 use rand::prelude::*;
@@ -18,7 +18,7 @@ use term_guard::core::{Check, Level, ValidationSuite};
 /// Creates a test dataset with the specified number of rows
 async fn create_test_data(rows: usize) -> SessionContext {
     let ctx = SessionContext::new();
-    let mut rng = thread_rng();
+    let mut rng = rand::rng();
 
     // Create schema
     let schema = Arc::new(Schema::new(vec![
@@ -40,9 +40,9 @@ async fn create_test_data(rows: usize) -> SessionContext {
         ids.push(i as i64);
 
         // 95% valid emails, 3% invalid, 2% null
-        let email = if rng.gen_range(0..100) < 95 {
+        let email = if rng.random_range(0..100) < 95 {
             Some(format!("user{i}@example.com"))
-        } else if rng.gen_range(0..100) < 98 {
+        } else if rng.random_range(0..100) < 98 {
             Some("invalid-email".to_string())
         } else {
             None
@@ -50,16 +50,16 @@ async fn create_test_data(rows: usize) -> SessionContext {
         emails.push(email);
 
         // Age between 18-80, 5% nulls
-        let age = if rng.gen_range(0..100) < 95 {
-            Some(rng.gen_range(18.0..80.0))
+        let age = if rng.random_range(0..100) < 95 {
+            Some(rng.random_range(18.0..80.0))
         } else {
             None
         };
         ages.push(age);
 
         // Salary between 30k-200k, 2% nulls
-        let salary = if rng.gen_range(0..100) < 98 {
-            Some(rng.gen_range(30000.0..200000.0))
+        let salary = if rng.random_range(0..100) < 98 {
+            Some(rng.random_range(30000.0..200000.0))
         } else {
             None
         };
@@ -67,7 +67,7 @@ async fn create_test_data(rows: usize) -> SessionContext {
 
         // Department from a fixed set
         let dept = ["Engineering", "Sales", "Marketing", "HR", "Finance"];
-        departments.push(Some(dept[rng.gen_range(0..dept.len())].to_string()));
+        departments.push(Some(dept[rng.random_range(0..dept.len())].to_string()));
     }
 
     // Create batch
@@ -132,7 +132,7 @@ fn bench_completeness(c: &mut Criterion) {
                         )
                         .build();
 
-                    black_box(suite.run(&ctx).await.unwrap())
+                    std::hint::black_box(suite.run(&ctx).await.unwrap())
                 },
                 BatchSize::SmallInput,
             );
@@ -165,7 +165,7 @@ fn bench_completeness(c: &mut Criterion) {
                         )
                         .build();
 
-                    black_box(suite.run(&ctx).await.unwrap())
+                    std::hint::black_box(suite.run(&ctx).await.unwrap())
                 },
                 BatchSize::SmallInput,
             );
@@ -248,7 +248,7 @@ fn bench_statistics(c: &mut Criterion) {
                             )
                             .build();
 
-                        black_box(suite.run(&ctx).await.unwrap())
+                        std::hint::black_box(suite.run(&ctx).await.unwrap())
                     },
                     BatchSize::SmallInput,
                 );
@@ -289,7 +289,7 @@ fn bench_statistics(c: &mut Criterion) {
                             )
                             .build();
 
-                        black_box(suite.run(&ctx).await.unwrap())
+                        std::hint::black_box(suite.run(&ctx).await.unwrap())
                     },
                     BatchSize::SmallInput,
                 );
@@ -333,7 +333,7 @@ fn bench_format_validation(c: &mut Criterion) {
                             )
                             .build();
 
-                        black_box(suite.run(&ctx).await.unwrap())
+                        std::hint::black_box(suite.run(&ctx).await.unwrap())
                     },
                     BatchSize::SmallInput,
                 );
@@ -364,7 +364,7 @@ fn bench_format_validation(c: &mut Criterion) {
                             )
                             .build();
 
-                        black_box(suite.run(&ctx).await.unwrap())
+                        std::hint::black_box(suite.run(&ctx).await.unwrap())
                     },
                     BatchSize::SmallInput,
                 );
@@ -386,7 +386,7 @@ fn bench_format_validation(c: &mut Criterion) {
                             .check(Check::builder("format").email("email", 0.9).build())
                             .build();
 
-                        black_box(suite.run(&ctx).await.unwrap())
+                        std::hint::black_box(suite.run(&ctx).await.unwrap())
                     },
                     BatchSize::SmallInput,
                 );
@@ -484,7 +484,7 @@ fn bench_complex_composition(c: &mut Criterion) {
                         )
                         .build();
 
-                    black_box(suite.run(&ctx).await.unwrap())
+                    std::hint::black_box(suite.run(&ctx).await.unwrap())
                 },
                 BatchSize::SmallInput,
             );
@@ -531,7 +531,7 @@ fn bench_complex_composition(c: &mut Criterion) {
                             )
                             .build();
 
-                        black_box(suite.run(&ctx).await.unwrap())
+                        std::hint::black_box(suite.run(&ctx).await.unwrap())
                     },
                     BatchSize::SmallInput,
                 );
@@ -583,7 +583,7 @@ fn bench_logical_operators(c: &mut Criterion) {
                             )
                             .build();
 
-                        black_box(suite.run(&ctx).await.unwrap())
+                        std::hint::black_box(suite.run(&ctx).await.unwrap())
                     },
                     BatchSize::SmallInput,
                 );
@@ -616,7 +616,7 @@ fn bench_logical_operators(c: &mut Criterion) {
                             )
                             .build();
 
-                        black_box(suite.run(&ctx).await.unwrap())
+                        std::hint::black_box(suite.run(&ctx).await.unwrap())
                     },
                     BatchSize::SmallInput,
                 );
@@ -645,7 +645,7 @@ fn bench_logical_operators(c: &mut Criterion) {
                             )
                             .build();
 
-                        black_box(suite.run(&ctx).await.unwrap())
+                        std::hint::black_box(suite.run(&ctx).await.unwrap())
                     },
                     BatchSize::SmallInput,
                 );

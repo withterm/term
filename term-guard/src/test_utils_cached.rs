@@ -45,7 +45,7 @@ static CONTEXT_CACHE: Lazy<ContextCache> = Lazy::new(|| Arc::new(RwLock::new(Has
 /// # }
 /// ```
 pub async fn get_or_create_tpc_h_context(scale: ScaleFactor) -> Result<Arc<SessionContext>> {
-    let cache_key = format!("tpc_h_{:?}", scale);
+    let cache_key = format!("tpc_h_{scale:?}");
 
     // Try to get from cache with read lock
     {

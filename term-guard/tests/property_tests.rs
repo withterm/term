@@ -725,7 +725,7 @@ proptest! {
             let mut rng = rand::rngs::StdRng::seed_from_u64(42);
 
             while values.len() < total_values {
-                let duplicate_value = rng.gen_range(0..num_unique) as i64;
+                let duplicate_value = rng.random_range(0..num_unique) as i64;
                 values.push(duplicate_value);
             }
 
