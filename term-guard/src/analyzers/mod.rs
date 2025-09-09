@@ -96,8 +96,9 @@ pub mod types;
 
 pub use anomaly::{
     AbsoluteChangeDetector, Anomaly, AnomalyDetectionConfig, AnomalyDetectionRunner,
-    AnomalyDetectionRunnerBuilder, AnomalyDetector, InMemoryMetricsRepository, MetricDataPoint,
-    MetricsRepository, RelativeRateOfChangeDetector, ZScoreDetector,
+    AnomalyDetectionRunnerBuilder, AnomalyDetectionStrategy, AnomalyDetector, AnomalyResult,
+    InMemoryMetricsRepository, MetricDataPoint, MetricPoint, MetricsRepository,
+    RelativeRateOfChangeDetector, RelativeRateOfChangeStrategy, ZScoreDetector,
 };
 pub use context::AnalyzerContext;
 pub use errors::{AnalyzerError, AnalyzerResult};

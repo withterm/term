@@ -4093,6 +4093,7 @@ name = "term-examples"
 version = "0.1.0"
 dependencies = [
  "arrow",
+ "chrono",
  "datafusion",
  "opentelemetry",
  "opentelemetry_sdk",

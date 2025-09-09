@@ -8,6 +8,7 @@ license = "MIT"
 
 [dependencies]
 arrow = "55"
+chrono = "0.4"
 datafusion = "48.0"
 opentelemetry = { version = "0.30", optional = true }
 opentelemetry_sdk = { version = "0.30", features = ["rt-tokio-current-thread", "testing"], optional = true }
@@ -61,3 +62,7 @@ path = "src/data_type_validation_example.rs"
 [[example]]
 name = "column_count_example"
 path = "src/column_count_example.rs"
+
+[[example]]
+name = "anomaly_detection_strategy"
+path = "src/anomaly_detection_strategy.rs"
