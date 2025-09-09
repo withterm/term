@@ -1,53 +1,16 @@
-//! Incremental computation framework for efficient processing of growing datasets.
-//!
-//! This module provides infrastructure for stateful metrics computation that can
-//! efficiently handle append-only data, partitioned datasets, and incremental updates
-//! without reprocessing all historical data.
-//!
-//! ## Architecture
-//!
-//! The incremental computation system consists of:
-//! - `StateStore`: Abstraction for persisting analyzer states
-//! - `IncrementalAnalysisRunner`: Orchestrates incremental analysis across partitions
-//! - Enhanced `AnalyzerState` implementations with merge capabilities
-//!
-//! ## Example
-//!
-//! ```rust,ignore
-//! use term_guard::analyzers::incremental::{IncrementalAnalysisRunner, FileSystemStateStore};
-//! use term_guard::analyzers::basic::SizeAnalyzer;
-//! use datafusion::prelude::*;
-//!
-//! # tokio::runtime::Runtime::new().unwrap().block_on(async {
-//! // Create state store
-//! let state_store = FileSystemStateStore::new("/tmp/term_states")?;
-//!
-//! // Create incremental runner
-//! let mut runner = IncrementalAnalysisRunner::new(
-//!     Box::new(state_store),
-//!     vec![Box::new(SizeAnalyzer::new())],
-//! );
-//!
-//! // Process new partition
-//! let ctx = SessionContext::new();
-//! // Register data for "2024-01-15" partition...
-//!
-//! let results = runner.analyze_partition(&ctx, "2024-01-15").await?;
-//! # Ok::<(), Box<dyn std::error::Error>>(())
-//! # });
-//! ```
+//! State storage abstraction for incremental computation.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
-use datafusion::prelude::*;
-use serde::{Deserialize, Serialize};
-use serde_json;
 use tokio::fs;
-use tracing::{debug, info, instrument, warn};
+use tracing::{debug, instrument};
 
-use crate::analyzers::{AnalyzerContext, AnalyzerError, AnalyzerResult};
+use crate::analyzers::{AnalyzerError, AnalyzerResult};
+
+/// Type alias for state storage - maps analyzer names to serialized states
+pub type StateMap = HashMap<String, Vec<u8>>;
 
 /// Trait for storing and retrieving analyzer states.
 ///
@@ -102,9 +65,6 @@ pub trait StateStore: Send + Sync {
         Ok(results)
     }
 }
-
-/// Type alias for state storage - maps analyzer names to serialized states
-pub type StateMap = HashMap<String, Vec<u8>>;
 
 /// File system implementation of StateStore.
 ///
@@ -260,178 +220,5 @@ impl StateStore for FileSystemStateStore {
         }
 
         Ok(())
-    }
-}
-
-/// Configuration for incremental analysis
-#[derive(Debug, Clone)]
-pub struct IncrementalConfig {
-    /// Whether to fail fast on first error
-    pub fail_fast: bool,
-    /// Whether to save empty states
-    pub save_empty_states: bool,
-    /// Maximum number of partitions to merge at once
-    pub max_merge_batch_size: usize,
-}
-
-impl Default for IncrementalConfig {
-    fn default() -> Self {
-        Self {
-            fail_fast: true,
-            save_empty_states: false,
-            max_merge_batch_size: 100,
-        }
-    }
-}
-
-/// Type-erased wrapper for serializing analyzer states
-#[derive(Serialize, Deserialize)]
-struct SerializedState {
-    analyzer_type: String,
-    state_data: serde_json::Value,
-}
-
-/// Orchestrates incremental analysis across partitions.
-///
-/// This is a placeholder implementation that demonstrates the incremental
-/// analysis concepts without full state serialization support.
-#[allow(dead_code)]
-pub struct IncrementalAnalysisRunner {
-    state_store: Box<dyn StateStore>,
-    config: IncrementalConfig,
-}
-
-impl IncrementalAnalysisRunner {
-    /// Creates a new incremental analysis runner (placeholder implementation)
-    pub fn new(
-        state_store: Box<dyn StateStore>,
-        _analyzers: Vec<()>, // Placeholder parameter
-    ) -> Self {
-        Self {
-            state_store,
-            config: IncrementalConfig::default(),
-        }
-    }
-
-    /// Creates a new incremental analysis runner with custom config (placeholder implementation)
-    pub fn with_config(
-        state_store: Box<dyn StateStore>,
-        _analyzers: Vec<()>, // Placeholder parameter
-        config: IncrementalConfig,
-    ) -> Self {
-        Self {
-            state_store,
-            config,
-        }
-    }
-
-    /// Analyzes a single partition (placeholder implementation)
-    ///
-    /// # Arguments
-    /// * `_ctx` - DataFusion context with registered data  
-    /// * `partition` - Partition identifier
-    ///
-    /// # Returns
-    /// Empty analysis context (placeholder)
-    #[instrument(skip(self, _ctx))]
-    pub async fn analyze_partition(
-        &self,
-        _ctx: &SessionContext,
-        partition: &str,
-    ) -> AnalyzerResult<AnalyzerContext> {
-        info!(partition = %partition, "Placeholder partition analysis");
-
-        // Return empty context for now
-        Ok(AnalyzerContext::new())
-    }
-
-    /// Computes metrics over a range of partitions by merging their states.
-    ///
-    /// This is a placeholder for now - full implementation would require
-    /// more complex state deserialization and type handling.
-    ///
-    /// # Arguments
-    /// * `partitions` - List of partition identifiers to analyze
-    ///
-    /// # Returns
-    /// The merged analysis context with aggregate metrics
-    #[instrument(skip(self))]
-    pub async fn analyze_partitions(
-        &self,
-        partitions: &[String],
-    ) -> AnalyzerResult<AnalyzerContext> {
-        info!(
-            partitions = partitions.len(),
-            "Analyzing multiple partitions"
-        );
-
-        if partitions.is_empty() {
-            return Ok(AnalyzerContext::new());
-        }
-
-        // For now, return empty context - full implementation would require
-        // more sophisticated state deserialization
-        warn!("Multi-partition analysis not yet fully implemented");
-        Ok(AnalyzerContext::new())
-    }
-
-    /// Analyzes new data and merges with existing partition state (placeholder implementation)
-    ///
-    /// # Arguments
-    /// * `_ctx` - DataFusion context with new data
-    /// * `partition` - Partition identifier
-    #[instrument(skip(self, _ctx))]
-    pub async fn analyze_incremental(
-        &self,
-        _ctx: &SessionContext,
-        partition: &str,
-    ) -> AnalyzerResult<AnalyzerContext> {
-        info!(partition = %partition, "Placeholder incremental analysis");
-
-        // Return empty context for now
-        Ok(AnalyzerContext::new())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::TempDir;
-
-    #[tokio::test]
-    async fn test_filesystem_state_store() {
-        let temp_dir = TempDir::new().unwrap();
-        let store = FileSystemStateStore::new(temp_dir.path()).unwrap();
-
-        // Test empty partition list
-        let partitions = store.list_partitions().await.unwrap();
-        assert!(partitions.is_empty());
-
-        // Test save and load
-        let mut state_map = StateMap::new();
-        state_map.insert("test_analyzer".to_string(), vec![1, 2, 3, 4]);
-
-        store
-            .save_state("2024-01-15", state_map.clone())
-            .await
-            .unwrap();
-
-        let loaded = store.load_state("2024-01-15").await.unwrap();
-        assert_eq!(loaded.get("test_analyzer"), state_map.get("test_analyzer"));
-
-        // Test partition list
-        let partitions = store.list_partitions().await.unwrap();
-        assert_eq!(partitions, vec!["2024-01-15"]);
-
-        // Test delete
-        store.delete_partition("2024-01-15").await.unwrap();
-        let partitions = store.list_partitions().await.unwrap();
-        assert!(partitions.is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_incremental_runner_basic() {
-        // This test would require implementing proper state serialization
-        // for the basic analyzers, which we'll do in the next step
     }
 }
