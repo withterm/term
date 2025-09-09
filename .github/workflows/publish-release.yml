@@ -168,7 +168,7 @@ jobs:
     if: ${{ github.event.release.prerelease }}
     steps:
       - name: Update pre-release notes
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const version = "${{ needs.validate-release.outputs.version }}";
