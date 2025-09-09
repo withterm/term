@@ -130,4 +130,4 @@ pub use multi_source::{CacheStats, MultiSourceValidator};
 pub use result::{ValidationIssue, ValidationMetrics, ValidationReport, ValidationResult};
 pub use suite::{ValidationSuite, ValidationSuiteBuilder};
 pub use unified::{ConstraintOptions, UnifiedCompletenessBase, UnifiedConstraint};
-pub use validation_context::{current_validation_context, ValidationContext};
+pub use validation_context::{current_validation_context, ValidationContext, CURRENT_CONTEXT};

@@ -4097,6 +4097,7 @@ dependencies = [
  "datafusion",
  "opentelemetry",
  "opentelemetry_sdk",
+ "tempfile",
  "term-guard",
  "tokio",
  "tracing-opentelemetry",
