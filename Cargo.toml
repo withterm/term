@@ -8,3 +8,21 @@ resolver = "2"
 [workspace.package]
 edition = "2021"
 rust-version = "1.70"
+
+# Optimize test compilation and execution
+[profile.test]
+opt-level = 1          # Small optimization for faster test execution
+debug = 1              # Reduced debug info for faster compilation
+lto = false           # Disable LTO for faster linking
+codegen-units = 256   # More parallelism during compilation
+
+# Optimize CI builds
+[profile.ci]
+inherits = "test"
+opt-level = 2         # More optimization for CI
+debug = 0             # No debug info in CI for faster builds
+
+# Optimize benchmarks
+[profile.bench]
+lto = "thin"          # Use thin LTO for benchmarks
+codegen-units = 1     # Single codegen unit for best performance

@@ -145,13 +145,24 @@ impl JoinedSource {
     #[instrument(skip(self))]
     pub fn generate_sql(&self, table_name: &str) -> String {
         let join_type_sql = self.join_condition.join_type.to_sql();
-        let on_clause = format!(
-            "ON {}.{} = {}.{}",
-            self.left_alias,
-            self.join_condition.left_column,
-            self.right_alias,
-            self.join_condition.right_column
-        );
+
+        // When joining tables, we need to check if the column already has a table prefix
+        // If it does (e.g., "orders.customer_id"), use it as-is
+        // If it doesn't (e.g., "customer_id"), add the table alias
+        let left_col = if self.join_condition.left_column.contains('.') {
+            self.join_condition.left_column.clone()
+        } else {
+            format!("{}.{}", self.left_alias, self.join_condition.left_column)
+        };
+
+        let right_col = if self.join_condition.right_column.contains('.') {
+            self.join_condition.right_column.clone()
+        } else {
+            format!("{}.{}", self.right_alias, self.join_condition.right_column)
+        };
+
+        let on_clause = format!("ON {} = {}", left_col, right_col);
+
         let mut sql = format!(
             "CREATE OR REPLACE VIEW {table_name} AS SELECT * FROM {} {join_type_sql} {} {on_clause}",
             self.left_alias,

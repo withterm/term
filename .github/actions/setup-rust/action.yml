@@ -26,6 +26,8 @@ runs:
     - name: Cache Rust dependencies
       uses: useblacksmith/rust-cache@v3
       with:
-        prefix-key: "v1-rust"
+        prefix-key: "v2-rust"
         shared-key: ${{ inputs.cache-key }}
         cache-on-failure: true
+        cache-all-crates: true
+        cache-targets: true
