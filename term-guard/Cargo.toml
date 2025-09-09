@@ -37,7 +37,7 @@ telemetry = ["dep:tracing-opentelemetry", "dep:opentelemetry", "dep:opentelemetr
 test-utils = ["dep:rand", "dep:parquet"]
 
 [dependencies]
-arrow = "55.2"
+arrow = "56.1"
 async-trait = "0.1"
 base64 = "0.22"
 bincode = "1.3"
