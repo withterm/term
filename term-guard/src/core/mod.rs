@@ -111,6 +111,8 @@
 mod check;
 mod constraint;
 mod context;
+mod debug_context;
+mod fluent_builder;
 mod level;
 mod logical;
 mod multi_source;
@@ -124,6 +126,10 @@ pub mod builder_extensions;
 pub use check::{Check, CheckBuilder};
 pub use constraint::{Constraint, ConstraintMetadata, ConstraintResult, ConstraintStatus};
 pub use context::{TermContext, TermContextConfig};
+pub use debug_context::{
+    DebugContext, DebugInfo, DebugLevel, DebugSummary, ErrorReport, ValidationResultDebugExt,
+};
+pub use fluent_builder::{CheckMultiTableExt, MultiTableCheck};
 pub use level::Level;
 pub use logical::{ColumnSpec, ConstraintOptionsBuilder, LogicalOperator, LogicalResult};
 pub use multi_source::{CacheStats, MultiSourceValidator};

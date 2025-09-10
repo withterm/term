@@ -275,6 +275,16 @@ impl CheckBuilder {
         self
     }
 
+    /// Adds an Arc constraint to the check.
+    ///
+    /// # Arguments
+    ///
+    /// * `constraint` - The Arc constraint to add
+    pub fn arc_constraint(mut self, constraint: Arc<dyn Constraint>) -> Self {
+        self.constraints.push(constraint);
+        self
+    }
+
     /// Adds multiple constraints to the check.
     ///
     /// # Arguments

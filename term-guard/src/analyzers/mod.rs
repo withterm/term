@@ -90,6 +90,7 @@ pub mod incremental;
 pub mod inference;
 pub mod profiler;
 pub mod runner;
+pub mod schema_analyzer;
 pub mod suggestions;
 pub mod traits;
 pub mod types;
@@ -114,6 +115,7 @@ pub use profiler::{
     ColumnProfilerBuilder, DetectedDataType, NumericDistribution, ProfilerConfig, ProfilerProgress,
 };
 pub use runner::AnalysisRunner;
+pub use schema_analyzer::{CrossTableSuggestion, SchemaAnalyzer};
 pub use suggestions::{
     CardinalityRule, CompletenessRule, ConstraintParameter, ConstraintSuggestionRule, DataTypeRule,
     PatternRule, RangeRule, SuggestedConstraint, SuggestionEngine, SuggestionPriority,
