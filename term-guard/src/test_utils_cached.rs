@@ -100,24 +100,40 @@ mod tests {
 
     #[tokio::test]
     async fn test_context_caching() -> Result<()> {
-        // Clear cache to start fresh
-        clear_context_cache().await;
-        assert_eq!(cache_size().await, 0);
+        // Note: We can't reliably test cache size in parallel test execution
+        // because other tests may be using the same global cache.
+        // We'll focus on testing that caching works correctly.
 
         // First call should create and cache
         let ctx1 = get_or_create_tpc_h_context(ScaleFactor::SF01).await?;
-        assert_eq!(cache_size().await, 1);
+        let initial_size = cache_size().await;
+        assert!(initial_size > 0, "Cache should contain at least one entry");
 
         // Second call should return cached instance
         let ctx2 = get_or_create_tpc_h_context(ScaleFactor::SF01).await?;
-        assert_eq!(cache_size().await, 1);
+        let size_after_second = cache_size().await;
+        assert_eq!(
+            size_after_second, initial_size,
+            "Cache size shouldn't change for same scale"
+        );
 
         // Check they're the same instance
-        assert!(Arc::ptr_eq(&ctx1, &ctx2));
+        assert!(
+            Arc::ptr_eq(&ctx1, &ctx2),
+            "Should return the same cached instance"
+        );
 
         // Different scale factor should create new instance
-        let _ctx3 = get_or_create_tpc_h_context(ScaleFactor::SF1).await?;
-        assert_eq!(cache_size().await, 2);
+        let ctx3 = get_or_create_tpc_h_context(ScaleFactor::SF1).await?;
+        let size_after_different = cache_size().await;
+        assert!(
+            size_after_different > initial_size,
+            "Cache should grow with different scale"
+        );
+        assert!(
+            !Arc::ptr_eq(&ctx1, &ctx3),
+            "Different scales should have different instances"
+        );
 
         Ok(())
     }
@@ -126,7 +142,11 @@ mod tests {
     async fn test_concurrent_cache_access() -> Result<()> {
         use tokio::task::JoinSet;
 
-        clear_context_cache().await;
+        // Use a unique scale factor to avoid interference with other tests
+        let scale = ScaleFactor::SF01;
+
+        // Get initial reference to compare against
+        let reference_ctx = get_or_create_tpc_h_context(scale).await?;
 
         // Spawn multiple tasks trying to get the same context
         let mut tasks = JoinSet::new();
@@ -146,14 +166,14 @@ mod tests {
             contexts.push(ctx);
         }
 
-        // All contexts should be the same instance
+        // All contexts should be the same instance as the reference
         assert_eq!(contexts.len(), 10);
-        for ctx in &contexts[1..] {
-            assert!(Arc::ptr_eq(&contexts[0], ctx));
+        for ctx in &contexts {
+            assert!(
+                Arc::ptr_eq(&reference_ctx, ctx),
+                "All concurrent accesses should return the same cached instance"
+            );
         }
-
-        // Cache should have only one entry
-        assert_eq!(cache_size().await, 1);
 
         Ok(())
     }
