@@ -1,0 +1,17 @@
+[package]
+name = "production-pipeline-example"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+term = { path = "../../../" }
+tokio = { version = "1.0", features = ["full"] }
+datafusion = "43.0"
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+opentelemetry = "0.20"
+opentelemetry-jaeger = "0.19"
+chrono = "0.4"

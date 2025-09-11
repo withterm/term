@@ -1,0 +1,16 @@
+customer_id,email,age,phone,address,created_date
+1001,john.doe@email.com,35,555-0101,123 Main St,2024-01-15
+1002,jane.smith@email.com,28,555-0102,456 Oak Ave,2024-01-16
+1003,bob.johnson@email.com,42,,789 Pine Rd,2024-01-17
+1004,alice.williams@email.com,31,555-0104,,2024-01-18
+1005,charlie.brown@email.com,25,555-0105,321 Elm St,2024-01-19
+1006,diana.prince@email.com,38,555-0106,654 Maple Dr,2024-01-20
+1007,eve.adams@invalid,29,,987 Cedar Ln,2024-01-21
+1008,frank.miller@email.com,45,555-0108,147 Birch Way,2024-01-22
+1009,grace.hopper@email.com,52,555-0109,,2024-01-23
+1010,henry.ford@email.com,61,555-0110,258 Spruce Ct,2024-01-24
+1011,iris.west@email.com,27,,369 Willow Pl,2024-01-25
+1012,jack.ryan@email.com,39,555-0112,741 Ash Blvd,2024-01-26
+1013,karen.page@email.com,33,555-0113,852 Poplar St,2024-01-27
+1014,luke.cage@email.com,36,,963 Sycamore Ave,2024-01-28
+1015,mary.jane@email.com,24,555-0115,159 Hickory Rd,2024-01-29
