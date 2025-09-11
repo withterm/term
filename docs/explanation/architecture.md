@@ -1,6 +1,23 @@
-# Term Architecture
+# Understanding Term's Architecture
 
-This document explains Term's architecture, design decisions, and how the various components work together to provide fast, reliable data validation.
+> **Type**: Explanation (Understanding-oriented)
+> **Audience**: Users seeking deeper understanding of Term's design
+> **Goal**: Provide context, theory, and design rationale
+
+## Introduction
+
+Term's architecture represents a fundamental shift in how we approach data validation. Unlike traditional frameworks that require heavyweight infrastructure like Spark clusters, Term delivers enterprise-grade data quality checks using modern Rust and Arrow-based query execution. This document explains the key architectural decisions and their implications.
+
+## Background
+
+Data validation has traditionally been tied to big data processing frameworks. Deequ requires Spark, Great Expectations needs pandas or Spark, and most solutions couple validation logic with specific compute engines. This coupling creates several problems:
+
+1. **Infrastructure overhead**: Running Spark for validation requires cluster management
+2. **Language barriers**: JVM-based tools exclude non-Java ecosystems  
+3. **Performance penalties**: Serialization overhead between language boundaries
+4. **Deployment complexity**: Containerizing Spark applications is non-trivial
+
+Term emerged from the recognition that modern columnar formats (Parquet, Arrow) and query engines (DataFusion) can deliver the same capabilities without these limitations.
 
 ## Overview
 

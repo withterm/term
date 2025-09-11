@@ -1,0 +1,10 @@
+[package]
+name = "basic-validation-example"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+term = { path = "../../../" }
+tokio = { version = "1.0", features = ["full"] }
+datafusion = "43.0"
+anyhow = "1.0"

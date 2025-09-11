@@ -1,10 +1,8 @@
 # [Feature/API Name] Reference
 
-<!-- 
-This is a REFERENCE template following Diátaxis principles.
-Reference docs are INFORMATION-oriented, not task-oriented.
-They describe the machinery comprehensively and accurately.
--->
+> **Type**: Reference (Information-oriented)
+> **Audience**: Users looking up specific details
+> **Goal**: Provide complete, accurate technical information
 
 ## Overview
 

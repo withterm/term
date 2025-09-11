@@ -1,10 +1,8 @@
-# Tutorial: [Title - Present Tense Verb Phrase]
+# Tutorial: [Title - Learning-oriented]
 
-<!-- 
-This is a TUTORIAL template following Diátaxis principles.
-Tutorials are LEARNING-oriented, not task-oriented.
-They teach through hands-on experience, not by explaining concepts.
--->
+> **Type**: Tutorial (Learning-oriented)
+> **Audience**: Newcomers to Term
+> **Goal**: Learn by doing, build understanding progressively
 
 ## What You'll Learn
 

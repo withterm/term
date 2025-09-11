@@ -1,10 +1,8 @@
 # How to [Task - Imperative Verb Phrase]
 
-<!-- 
-This is a HOW-TO GUIDE template following Diátaxis principles.
-How-to guides are TASK-oriented, not learning-oriented.
-They help users accomplish specific goals.
--->
+> **Type**: How-To Guide (Task-oriented)
+> **Audience**: Practitioners using Term
+> **Goal**: Complete a specific task efficiently
 
 ## Goal
 

@@ -1,10 +1,8 @@
 # Understanding [Concept]
 
-<!-- 
-This is an EXPLANATION template following Diátaxis principles.
-Explanations are UNDERSTANDING-oriented, not task-oriented.
-They provide context, background, and discuss topics broadly.
--->
+> **Type**: Explanation (Understanding-oriented)
+> **Audience**: Users seeking deeper understanding
+> **Goal**: Provide context, theory, and design rationale
 
 ## Introduction
 

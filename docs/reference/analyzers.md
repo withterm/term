@@ -324,6 +324,112 @@ pub fn with_name(predicate: impl Into<String>, name: impl Into<String>) -> Self
 
 **Security:** Validates predicates to prevent SQL injection
 
+### KllSketchAnalyzer
+
+Computes approximate quantiles using the KLL (Karnin-Lang-Liberty) sketch algorithm with O(k log n) memory complexity.
+
+```rust
+pub struct KllSketchAnalyzer {
+    column: String,
+    k: usize,
+    quantiles: Vec<f64>,
+}
+```
+
+**Constructor:**
+```rust
+pub fn new(column: impl Into<String>) -> Self
+pub fn with_k(column: impl Into<String>, k: usize) -> Self
+pub fn with_quantiles(column: impl Into<String>, quantiles: Vec<f64>) -> Self
+```
+
+**Metric Key:** `"kll_sketch"`  
+**Metric Type:** `MetricValue::Distribution` containing:
+- `min`: Minimum value
+- `max`: Maximum value
+- `count`: Number of values
+- `quantile_{p}`: Value at percentile p (for each requested quantile)
+
+**Module:** `term_guard::analyzers::advanced::kll_sketch`
+
+**Default:** `k = 200`, `quantiles = [0.25, 0.5, 0.75, 0.9, 0.95, 0.99]`
+
+**Memory:** O(k) where k controls accuracy/memory tradeoff
+
+### CorrelationAnalyzer
+
+Analyzes statistical relationships between two columns using various correlation methods.
+
+```rust
+pub struct CorrelationAnalyzer {
+    column1: String,
+    column2: String,
+    method: CorrelationMethod,
+}
+
+pub enum CorrelationMethod {
+    Pearson,
+    Spearman,
+    Covariance,
+}
+```
+
+**Constructor:**
+```rust
+pub fn pearson(column1: impl Into<String>, column2: impl Into<String>) -> Self
+pub fn spearman(column1: impl Into<String>, column2: impl Into<String>) -> Self
+pub fn covariance(column1: impl Into<String>, column2: impl Into<String>) -> Self
+```
+
+**Metric Key:** `"correlation.{method}"`  
+**Metric Type:** `MetricValue::Distribution` containing:
+- `coefficient`: Correlation coefficient (-1 to 1 for Pearson/Spearman)
+- `covariance`: Covariance value (for covariance method)
+- `count`: Number of paired values
+- `method`: The correlation method used
+
+**Module:** `term_guard::analyzers::advanced::correlation`
+
+**Methods:**
+- **Pearson**: Linear correlation for continuous variables
+- **Spearman**: Rank correlation for monotonic relationships
+- **Covariance**: Measures joint variability
+
+### MutualInformationAnalyzer
+
+Measures statistical dependence between two columns using information theory.
+
+```rust
+pub struct MutualInformationAnalyzer {
+    column1: String,
+    column2: String,
+    num_bins: Option<usize>,
+}
+```
+
+**Constructor:**
+```rust
+pub fn new(column1: impl Into<String>, column2: impl Into<String>) -> Self
+pub fn with_bins(column1: impl Into<String>, column2: impl Into<String>, num_bins: usize) -> Self
+```
+
+**Metric Key:** `"mutual_information"`  
+**Metric Type:** `MetricValue::Distribution` containing:
+- `mutual_information`: MI score in bits (0 = independent, higher = more dependent)
+- `normalized_mi`: Normalized MI (0 to 1)
+- `entropy_x`: Entropy of first column
+- `entropy_y`: Entropy of second column
+- `joint_entropy`: Joint entropy of both columns
+
+**Module:** `term_guard::analyzers::advanced::mutual_information`
+
+**Default:** `num_bins = 10` for continuous data discretization
+
+**Use Cases:**
+- Feature selection in machine learning
+- Detecting non-linear relationships
+- Information flow analysis
+
 ## State Types
 
 Each analyzer has a corresponding state type that implements `AnalyzerState`:
@@ -397,6 +503,9 @@ Analyzers return `AnalyzerResult<T>` which may contain:
 | SumAnalyzer | O(n) | O(1) | Yes |
 | ApproxCountDistinctAnalyzer | O(n) | O(1) | Yes |
 | StandardDeviationAnalyzer | O(n) | O(1) | Yes |
+| KllSketchAnalyzer | O(n log k) | O(k) | Yes |
+| CorrelationAnalyzer | O(n) | O(1) | Yes |
+| MutualInformationAnalyzer | O(n) | O(bins²) | Yes |
 | DataTypeAnalyzer | O(n) | O(types) | Yes |
 | HistogramAnalyzer | O(n log n) | O(buckets) | Yes |
 | EntropyAnalyzer | O(n) | O(unique) | Yes |
