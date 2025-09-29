@@ -1,0 +1,72 @@
+[package]
+name = "term-hooks"
+version = "0.1.0"
+edition = "2021"
+authors = ["Term Contributors"]
+description = "Claude Code hooks for Term data validation library"
+license = "Apache-2.0"
+
+[[bin]]
+name = "user-prompt-submit"
+path = "src/bin/user_prompt_submit.rs"
+
+[[bin]]
+name = "pre-tool-use"
+path = "src/bin/pre_tool_use.rs"
+
+[[bin]]
+name = "post-tool-use"
+path = "src/bin/post_tool_use.rs"
+
+[[bin]]
+name = "session-start"
+path = "src/bin/session_start.rs"
+
+[[bin]]
+name = "notification"
+path = "src/bin/notification.rs"
+
+[[bin]]
+name = "stop"
+path = "src/bin/stop.rs"
+
+[[bin]]
+name = "pre-compact"
+path = "src/bin/pre_compact.rs"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+regex = "1.10"
+anyhow = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tokio = { version = "1", features = ["full"] }
+clap = { version = "4.5", features = ["derive"] }
+dirs = "5.0"
+
+# For file operations and logging
+fs2 = "0.4"
+tempfile = "3.10"
+
+# For git operations
+git2 = "0.18"
+
+# Optional: For OpenTelemetry integration
+opentelemetry = { version = "0.24", optional = true }
+opentelemetry-otlp = { version = "0.17", optional = true }
+opentelemetry_sdk = { version = "0.24", optional = true, features = ["rt-tokio"] }
+tracing-opentelemetry = { version = "0.25", optional = true }
+
+# For Linear integration (optional)
+reqwest = { version = "0.12", optional = true, features = ["json"] }
+
+[features]
+default = []
+telemetry = ["opentelemetry", "opentelemetry-otlp", "opentelemetry_sdk", "tracing-opentelemetry"]
+linear = ["reqwest"]
+
+[dev-dependencies]
+tempfile = "3.10"
+mockito = "1.4"

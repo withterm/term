@@ -42,3 +42,6 @@ CLAUDE.md
 *.swo
 *~
 .DS_Store
+
+# Hook logs
+logs/

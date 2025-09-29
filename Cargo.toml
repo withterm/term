@@ -1,7 +1,11 @@
 [workspace]
 members = [
   "term-guard",
+  "term-hooks",
   "examples",
+]
+exclude = [
+  ".claude/hooks-rs",
 ]
 resolver = "2"
 
