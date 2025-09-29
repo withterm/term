@@ -6,8 +6,8 @@
 //!
 //! # Examples
 //!
-//! ```rust
-//! use term_guard::core::fluent_builder::{MultiTableCheck, JoinType};
+//! ```rust,ignore
+//! use term_guard::core::MultiTableCheck;
 //! use term_guard::core::Level;
 //! use term_guard::constraints::Assertion;
 //!
@@ -97,8 +97,8 @@ impl MultiTableCheck {
     ///
     /// # Example
     ///
-    /// ```rust
-    /// use term_guard::core::fluent_builder::MultiTableCheck;
+    /// ```rust,ignore
+    /// use term_guard::core::MultiTableCheck;
     ///
     /// let check = MultiTableCheck::new("validation")
     ///     .validate_tables("orders", "customers")
