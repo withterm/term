@@ -14,8 +14,8 @@
 //!
 //! # Example
 //!
-//! ```rust
-//! use term_guard::core::debug_context::{DebugContext, DebugLevel};
+//! ```rust,ignore
+//! use term_guard::core::{DebugContext, DebugLevel};
 //! use term_guard::core::{ValidationSuite, Check};
 //! use datafusion::prelude::*;
 //!

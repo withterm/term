@@ -288,6 +288,34 @@ impl TermError {
     }
 }
 
+/// Conversion from AnalyzerError to TermError.
+impl From<crate::analyzers::AnalyzerError> for TermError {
+    fn from(err: crate::analyzers::AnalyzerError) -> Self {
+        use crate::analyzers::AnalyzerError;
+
+        match err {
+            AnalyzerError::StateComputation(msg) => {
+                TermError::Internal(format!("Analyzer state computation failed: {msg}"))
+            }
+            AnalyzerError::MetricComputation(msg) => {
+                TermError::Internal(format!("Analyzer metric computation failed: {msg}"))
+            }
+            AnalyzerError::StateMerge(msg) => {
+                TermError::Internal(format!("Analyzer state merge failed: {msg}"))
+            }
+            AnalyzerError::QueryExecution(e) => TermError::DataFusion(e),
+            AnalyzerError::ArrowComputation(e) => TermError::Arrow(e),
+            AnalyzerError::InvalidConfiguration(msg) => TermError::Configuration(msg),
+            AnalyzerError::InvalidData(msg) => TermError::Parse(msg),
+            AnalyzerError::NoData => {
+                TermError::Internal("No data available for analysis".to_string())
+            }
+            AnalyzerError::Serialization(msg) => TermError::Serialization(msg),
+            AnalyzerError::Custom(msg) => TermError::Internal(msg),
+        }
+    }
+}
+
 /// Extension trait for adding context to errors.
 pub trait ErrorContext<T> {
     /// Adds context to an error.

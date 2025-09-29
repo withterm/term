@@ -86,6 +86,7 @@ pub mod anomaly;
 pub mod basic;
 pub mod context;
 pub mod errors;
+pub mod grouped;
 pub mod incremental;
 pub mod inference;
 pub mod profiler;
@@ -103,6 +104,10 @@ pub use anomaly::{
 };
 pub use context::AnalyzerContext;
 pub use errors::{AnalyzerError, AnalyzerResult};
+pub use grouped::{
+    GroupedAnalyzer, GroupedAnalyzerState, GroupedAnalyzerWrapper, GroupedMetadata, GroupedMetrics,
+    GroupingConfig, OverflowStrategy,
+};
 pub use incremental::{
     FileSystemStateStore, IncrementalAnalysisRunner, IncrementalConfig, StateStore,
 };

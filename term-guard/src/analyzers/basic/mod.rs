@@ -7,6 +7,7 @@
 
 mod completeness;
 mod distinctness;
+mod grouped_completeness;
 mod mean;
 mod min_max;
 mod size;
@@ -14,6 +15,7 @@ mod sum;
 
 pub use completeness::{CompletenessAnalyzer, CompletenessState};
 pub use distinctness::{DistinctnessAnalyzer, DistinctnessState};
+pub use grouped_completeness::GroupedCompletenessState;
 pub use mean::{MeanAnalyzer, MeanState};
 pub use min_max::{MaxAnalyzer, MinAnalyzer, MinMaxState};
 pub use size::{SizeAnalyzer, SizeState};
