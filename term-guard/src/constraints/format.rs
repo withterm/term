@@ -208,6 +208,8 @@ pub enum FormatType {
     Json,
     /// ISO 8601 date-time format validation
     Iso8601DateTime,
+    /// Social Security Number (SSN) pattern detection
+    SocialSecurityNumber,
 }
 
 impl FormatType {
@@ -284,6 +286,13 @@ impl FormatType {
                 // ISO 8601 date-time format (basic validation)
                 r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$".to_string()
             }
+            FormatType::SocialSecurityNumber => {
+                // SSN patterns: XXX-XX-XXXX or XXXXXXXXX
+                // Matches valid SSN ranges (001-899 except 666) in first 3 digits
+                // Middle 2 digits must be 01-99, last 4 must be 0001-9999
+                // This regex avoids look-ahead by explicitly listing valid ranges
+                r"^(00[1-9]|0[1-9][0-9]|[1-5][0-9]{2}|6[0-5][0-9]|66[0-5]|667|66[89]|6[7-9][0-9]|[7-8][0-9]{2})-?(0[1-9]|[1-9][0-9])-?(000[1-9]|00[1-9][0-9]|0[1-9][0-9]{2}|[1-9][0-9]{3})$".to_string()
+            }
         };
 
         // Cache the pattern
@@ -311,6 +320,7 @@ impl FormatType {
             FormatType::IPv6 => "ipv6",
             FormatType::Json => "json",
             FormatType::Iso8601DateTime => "iso8601_datetime",
+            FormatType::SocialSecurityNumber => "social_security_number",
         }
     }
 
@@ -345,6 +355,9 @@ impl FormatType {
             FormatType::IPv6 => "are valid IPv6 addresses".to_string(),
             FormatType::Json => "are valid JSON documents".to_string(),
             FormatType::Iso8601DateTime => "are valid ISO 8601 date-time strings".to_string(),
+            FormatType::SocialSecurityNumber => {
+                "contain Social Security Number patterns".to_string()
+            }
         }
     }
 }
@@ -680,6 +693,39 @@ impl FormatConstraint {
             FormatType::Regex(pattern.into()),
             threshold,
             FormatOptions::default(),
+        )
+    }
+
+    /// Creates a format constraint for Social Security Number pattern detection.
+    ///
+    /// This method checks for SSN patterns (XXX-XX-XXXX or XXXXXXXXX) and excludes
+    /// known invalid SSNs such as those starting with 000, 666, or 900-999.
+    ///
+    /// # Arguments
+    ///
+    /// * `column` - The column to check for SSN patterns
+    /// * `threshold` - The minimum ratio of values that must match the SSN pattern (0.0 to 1.0)
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use term_guard::constraints::FormatConstraint;
+    ///
+    /// # fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// // Check that at least 95% of values are valid SSN patterns
+    /// let ssn_check = FormatConstraint::social_security_number("ssn", 0.95)?;
+    ///
+    /// // For PII detection - flag if more than 1% contain SSN patterns
+    /// let ssn_detection = FormatConstraint::social_security_number("description", 0.01)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn social_security_number(column: impl Into<String>, threshold: f64) -> Result<Self> {
+        Self::new(
+            column,
+            FormatType::SocialSecurityNumber,
+            threshold,
+            FormatOptions::new().trim_before_check(true),
         )
     }
 }
@@ -1337,5 +1383,127 @@ mod tests {
         assert!(options.case_sensitive);
         assert!(options.trim_before_check);
         assert!(options.null_is_valid);
+    }
+
+    #[tokio::test]
+    async fn test_ssn_format_valid() {
+        let values = vec![
+            Some("123-45-6789"), // Valid hyphenated
+            Some("123456789"),   // Valid non-hyphenated
+            Some("456-78-9012"), // Valid hyphenated
+            Some("789012345"),   // Valid non-hyphenated
+        ];
+        let ctx = create_test_context(values).await;
+
+        let constraint = FormatConstraint::social_security_number("text_col", 0.95).unwrap();
+
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
+        assert_eq!(result.status, ConstraintStatus::Success);
+        assert_eq!(result.metric, Some(1.0)); // All are valid SSNs
+        assert_eq!(constraint.name(), "social_security_number");
+    }
+
+    #[tokio::test]
+    async fn test_ssn_format_invalid_patterns() {
+        let values = vec![
+            Some("000-12-3456"), // Invalid: starts with 000
+            Some("666-12-3456"), // Invalid: starts with 666
+            Some("900-12-3456"), // Invalid: starts with 9xx
+            Some("123-00-4567"), // Invalid: middle is 00
+            Some("123-45-0000"), // Invalid: last four are 0000
+        ];
+        let ctx = create_test_context(values).await;
+
+        // Threshold means we expect AT LEAST that percentage to be valid
+        // Since none are valid (0.0), and we're expecting at least 0.0, it's Success
+        let constraint = FormatConstraint::social_security_number("text_col", 0.0).unwrap();
+
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
+        // None of these should be valid with our regex
+        // 0.0 >= 0.0 means Success
+        assert_eq!(result.status, ConstraintStatus::Success);
+        assert_eq!(result.metric, Some(0.0)); // None should be valid
+    }
+
+    #[tokio::test]
+    async fn test_ssn_format_mixed() {
+        let values = vec![
+            Some("123-45-6789"), // Valid
+            Some("not-an-ssn"),  // Invalid format
+            Some("666-12-3456"), // Invalid: starts with 666
+            Some("456789012"),   // Valid non-hyphenated
+            Some("123 45 6789"), // Invalid: spaces instead of hyphens
+            Some("789-01-2345"), // Valid
+            None,                // Null value
+            Some("234-56-7890"), // Valid
+        ];
+        let ctx = create_test_context(values).await;
+
+        let constraint = FormatConstraint::social_security_number("text_col", 0.5).unwrap();
+
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
+        assert_eq!(result.status, ConstraintStatus::Success);
+        // Valid SSNs: 123-45-6789, 456789012, 789-01-2345, 234-56-7890
+        // Invalid: not-an-ssn, 666-12-3456, "123 45 6789" (spaces)
+        // Null is handled by default options (null_is_valid = true in FormatOptions)
+        // So we have 4 valid + 1 null = 5 matches out of 8 total = 0.625
+        assert_eq!(result.metric, Some(0.625));
+    }
+
+    #[tokio::test]
+    async fn test_ssn_format_threshold() {
+        let values = vec![
+            Some("123-45-6789"), // Valid
+            Some("invalid"),     // Invalid
+            Some("234-56-7890"), // Valid
+            Some("not-ssn"),     // Invalid
+        ];
+        let ctx = create_test_context(values).await;
+
+        // Test with threshold that should fail
+        let constraint = FormatConstraint::social_security_number("text_col", 0.8).unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
+        assert_eq!(result.status, ConstraintStatus::Failure); // 0.5 < 0.8
+        assert_eq!(result.metric, Some(0.5));
+
+        // Test with threshold that should pass
+        let constraint = FormatConstraint::social_security_number("text_col", 0.4).unwrap();
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
+        assert_eq!(result.status, ConstraintStatus::Success); // 0.5 >= 0.4
+        assert_eq!(result.metric, Some(0.5));
+    }
+
+    #[tokio::test]
+    async fn test_ssn_edge_cases() {
+        let values = vec![
+            Some("078-05-1120"),  // Valid: Woolworth's SSN (historically used in examples)
+            Some("219-09-9999"),  // Valid: Used in advertisements
+            Some("457-55-5462"),  // Valid: Used in LifeLock ads
+            Some("999-99-9999"),  // Invalid: starts with 9xx
+            Some("123-45-67890"), // Invalid: too many digits
+            Some("12-345-6789"),  // Invalid: wrong format
+            Some("ABC-DE-FGHI"),  // Invalid: letters
+            Some(""),             // Invalid: empty string
+        ];
+        let ctx = create_test_context(values).await;
+
+        let constraint = FormatConstraint::social_security_number("text_col", 0.3).unwrap();
+
+        let result = evaluate_constraint_with_context(&constraint, &ctx, "data")
+            .await
+            .unwrap();
+        // Only first 3 are valid
+        assert_eq!(result.metric, Some(0.375)); // 3 out of 8
+        assert_eq!(result.status, ConstraintStatus::Success); // 0.375 >= 0.3
     }
 }
