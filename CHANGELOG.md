@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Social Security Number (SSN) Pattern Detection** (TER-338)
+  - New `FormatType::SocialSecurityNumber` variant for validating SSN patterns
+  - Supports both hyphenated (XXX-XX-XXXX) and non-hyphenated (XXXXXXXXX) formats
+  - Automatically excludes known invalid SSNs (000-xx-xxxx, 666-xx-xxxx, 9xx-xx-xxxx, etc.)
+  - `FormatConstraint::social_security_number()` method for direct SSN validation
+  - `CheckBuilder::contains_ssn()` convenience method for builder pattern
+  - Deequ-compatible `containsSocialSecurityNumber()` functionality
+
 ## [0.2.0] - 2025-09-11
 
 ### Added

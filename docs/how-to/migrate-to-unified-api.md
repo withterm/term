@@ -173,6 +173,7 @@ let check = Check::builder("validation")
     .validates_email_with_options("email", 0.95, FormatOptions::strict())
     .validates_url_with_options("website", 0.90, FormatOptions::default())
     .validates_phone_with_options("phone", 0.85, FormatOptions::lenient())
+    .contains_ssn("ssn_column", 0.95)
     .build();
 ```
 
@@ -187,6 +188,7 @@ Here's a sed-based script to help with basic migrations:
 # Format constraints
 sed -i 's/EmailConstraint::new(/FormatConstraint::email(/g' **/*.rs
 sed -i 's/UrlConstraint::new(/FormatConstraint::url(/g' **/*.rs
+sed -i 's/SsnConstraint::new(/FormatConstraint::social_security_number(/g' **/*.rs
 sed -i 's/PatternConstraint::new(\([^,]*\), \([^,]*\), \([^)]*\))/FormatConstraint::regex(\1, \3, \2)/g' **/*.rs
 
 # Add error handling where needed

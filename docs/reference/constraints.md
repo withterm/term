@@ -272,11 +272,13 @@ pub fn new(column: &str, threshold: f64, should_detect: bool) -> Result<Self>
 
 - **`should_detect`**: `bool` - Whether to expect credit card numbers (false for security checks)
 
-#### `SsnConstraint::new`
+#### `FormatConstraint::social_security_number`
 
 ```rust
-pub fn new(column: &str, threshold: f64, should_detect: bool) -> Result<Self>
+pub fn social_security_number(column: impl Into<String>, threshold: f64) -> Result<Self>
 ```
+
+Validates US Social Security Number patterns (XXX-XX-XXXX or XXXXXXXXX), automatically excluding known invalid SSNs.
 
 #### Builder Methods
 
@@ -284,7 +286,7 @@ pub fn new(column: &str, threshold: f64, should_detect: bool) -> Result<Self>
 - **`.contains_url(column, threshold)`** - URL format validation
 - **`.contains_email(column, threshold)`** - Email format validation
 - **`.contains_credit_card_number(column, threshold)`** - Credit card detection
-- **`.contains_social_security_number(column, threshold)`** - SSN detection
+- **`.contains_ssn(column, threshold)`** - SSN pattern detection
 
 ### Schema Constraints
 
