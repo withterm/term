@@ -376,6 +376,35 @@ impl CheckBuilder {
         )
     }
 
+    /// Adds Social Security Number (SSN) pattern validation.
+    ///
+    /// Validates that values in the specified column match US Social Security Number
+    /// patterns. Accepts both hyphenated (XXX-XX-XXXX) and non-hyphenated (XXXXXXXXX)
+    /// formats. Automatically excludes known invalid SSNs (e.g., 000-xx-xxxx, xxx-00-xxxx,
+    /// 666-xx-xxxx, 9xx-xx-xxxx).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use term_guard::core::Check;
+    ///
+    /// # use term_guard::prelude::*;
+    /// # fn example() -> Result<Check> {
+    /// let check = Check::builder("ssn_validation")
+    ///     .contains_ssn("ssn_column", 0.95)
+    ///     .build();
+    /// # Ok(check)
+    /// # }
+    /// ```
+    pub fn contains_ssn(self, column: impl Into<String>, threshold: f64) -> Self {
+        self.has_format(
+            column,
+            FormatType::SocialSecurityNumber,
+            threshold,
+            FormatOptions::new().trim_before_check(true),
+        )
+    }
+
     /// Adds value range validation (min and max).
     ///
     /// # Examples
