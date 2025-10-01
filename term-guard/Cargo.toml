@@ -18,7 +18,7 @@ name = "term-guard"
 readme = "../README.md"
 repository = "https://github.com/withterm/term"
 rust-version = "1.70"
-version = "0.0.1"
+version = "0.0.2"
 
 [features]
 default = []
@@ -44,8 +44,7 @@ bincode = "1.3"
 chrono = {version = "0.4", features = ["serde"]}
 datafusion = "48.0.1"
 futures = "0.3"
-datafusion-table-providers = { git = "https://github.com/datafusion-contrib/datafusion-table-providers.git", tag = "v0.6.3", optional = true }
-# TODO: Replace with crates.io version when available
+datafusion-table-providers = { version = "0.6.3", optional = true }
 glob = "0.3"
 hex = "0.4"
 num_cpus = "1.16"
