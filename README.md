@@ -89,7 +89,108 @@ let suite = ValidationSuite::builder("Production Pipeline")
 let report = suite.run(&ctx).await?;
 ```
 
-## 🤖 Smart Constraint Suggestions (New!)
+## 🆕 What's New in v0.0.2
+
+### 🎯 Incremental Analysis - Process Only What's Changed
+
+```rust
+use term_guard::analyzers::{IncrementalAnalysisRunner, FilesystemStateStore};
+
+// Initialize with state persistence
+let store = FilesystemStateStore::new("./metrics_state");
+let runner = IncrementalAnalysisRunner::new(store);
+
+// Process daily partitions incrementally
+let state = runner.analyze_partition(
+    &ctx,
+    "2025-09-30",  // Today's partition
+    vec![analyzer],
+).await?;
+
+// Only new data is processed, previous results are reused!
+```
+
+### 📊 Advanced Analytics - KLL Sketches & Correlation
+
+```rust
+use term_guard::analyzers::{KllSketchAnalyzer, CorrelationAnalyzer};
+
+// Approximate quantiles with minimal memory
+let kll = KllSketchAnalyzer::new("response_time")
+    .with_k(256)  // Higher k = better accuracy
+    .with_quantiles(vec![0.5, 0.95, 0.99]);
+
+// Detect relationships between metrics
+let correlation = CorrelationAnalyzer::new("ad_spend", "revenue")
+    .with_method(CorrelationMethod::Spearman);  // Handles non-linear
+
+let results = runner.run_analyzers(vec![kll, correlation]).await?;
+```
+
+### 🔍 Multi-Table Validation - Foreign Keys & Joins
+
+```rust
+// Validate relationships across tables with fluent API
+let suite = ValidationSuite::builder("Cross-table integrity")
+    .check(
+        Check::builder("Referential integrity")
+            .foreign_key("orders.customer_id", "customers.id")
+            .temporal_consistency("orders", "created_at", "updated_at")
+            .build()
+    )
+    .build();
+```
+
+### 🛡️ Enhanced Security - SSN & PII Detection
+
+```rust
+// New format validators including SSN detection
+let check = Check::builder("PII Protection")
+    .contains_ssn("ssn_field")         // Validates SSN format
+    .contains_credit_card("cc_field")  // Credit card detection
+    .contains_email("email_field")     // Email validation
+    .build();
+```
+
+### 🚨 Anomaly Detection - Catch Outliers Automatically
+
+```rust
+use term_guard::analyzers::{AnomalyDetector, RelativeRateOfChangeStrategy};
+
+// Detect sudden metric changes
+let detector = AnomalyDetector::new()
+    .with_strategy(RelativeRateOfChangeStrategy::new()
+        .max_rate_increase(0.5)  // Flag 50%+ increases
+        .max_rate_decrease(0.3)  // Flag 30%+ decreases
+    );
+
+let anomalies = detector.detect(&historical_metrics, &current_metric)?;
+```
+
+### 📈 Grouped Metrics - Segment-Level Analysis
+
+```rust
+use term_guard::analyzers::{GroupedCompletenessAnalyzer};
+
+// Analyze data quality by segment
+let analyzer = GroupedCompletenessAnalyzer::new()
+    .group_by(vec!["region", "product_category"])
+    .analyze_column("revenue");
+
+// Get metrics for each group combination
+let results = analyzer.compute(&ctx).await?;
+// e.g., completeness for region=US & category=Electronics
+```
+
+### 🔧 Improved Developer Experience
+
+- **Fluent Builder API**: Natural language-like validation rules
+- **Auto Schema Detection**: Automatic foreign key and temporal column discovery
+- **Debug Context**: Detailed error reporting with actionable suggestions
+- **Dependency Updates**: Updated to latest stable versions (criterion 0.7, rand 0.9, thiserror 2.0)
+- **Test Infrastructure**: >95% test coverage with TPC-H integration tests
+
+## 🤖 Smart Constraint Suggestions
 
 **Don't know what to validate? Term can analyze your data and suggest constraints automatically:**
 
@@ -175,6 +276,13 @@ Term analyzes your actual data patterns to recommend the most relevant quality c
 Dataset: 1M rows, 20 constraints
 Without optimizer: 3.2s (20 full scans)
 With Term:         0.21s (2 optimized scans)
+
+v0.0.2 Performance Improvements:
+- 30-50% faster CI/CD with cargo-nextest
+- Memory-efficient KLL sketches for quantile computation
+- SQL window functions for correlation analysis  
+- Cached SessionContext for test speedup
+- Comprehensive benchmark suite for regression detection
 ```
 
 ## 🚀 Getting Started
@@ -183,11 +291,11 @@ With Term:         0.21s (2 optimized scans)
 
 ```toml
 [dependencies]
-term-guard = "0.0.1"
+term-guard = "0.0.2"
 tokio = { version = "1", features = ["full"] }
 
 # Optional features
-term-guard = { version = "0.0.1", features = ["cloud-storage"] }  # S3, GCS, Azure support
+term-guard = { version = "0.0.2", features = ["cloud-storage"] }  # S3, GCS, Azure support
 ```
 
 ### Learn Term in 30 Minutes
@@ -204,13 +312,25 @@ Check out the [`examples/`](examples/) directory for real-world scenarios:
 - [`cloud_storage_example.rs`](examples/src/cloud_storage_example.rs) - Validate S3/GCS data
 - [`telemetry_example.rs`](examples/src/telemetry_example.rs) - Production monitoring
 - [`tpc_h_validation.rs`](examples/src/tpc_h_validation.rs) - Complex business rules
+- [`incremental_analysis.rs`](examples/src/incremental_analysis.rs) - Incremental computation
+- [`anomaly_detection_strategy.rs`](examples/src/anomaly_detection_strategy.rs) - Anomaly detection
+- [`grouped_metrics.rs`](examples/grouped_metrics.rs) - Segment-level analysis
 
 ## 📚 Documentation
 
 Our documentation is organized using the [Diátaxis](https://diataxis.fr/) framework:
 
 - **[Tutorials](docs/tutorials/)** - Learn Term step-by-step
+  - [Getting Started](docs/tutorials/01-getting-started.md)
+  - [Format Validation](docs/tutorials/08-format-validation.md)
+  - [Metrics Repository](docs/tutorials/09-metrics-repository.md)
+  - [Anomaly Detection](docs/tutorials/10-anomaly-detection.md)
+  - [Incremental Analysis](docs/tutorials/12-incremental-analysis.md)
 - **[How-To Guides](docs/how-to/)** - Solve specific problems
+  - [Use Analyzers](docs/how-to/use-analyzers.md)
+  - [Migrate from Deequ](docs/how-to/migrate-from-deequ.md)
+  - [Run Benchmarks](docs/how-to/run-benchmarks.md)
+  - [Use KLL Sketches](docs/how-to/use-kll-sketches.md)
 - **[Reference](docs/reference/)** - Technical specifications
 - **[Explanation](docs/explanation/)** - Understand the concepts
 - **[API Docs](https://docs.rs/term-guard)** - Complete Rust documentation
@@ -232,7 +352,7 @@ cargo test
 
 ## 🗺️ Roadmap
 
-### Now (v0.0.1)
+### Released (v0.0.1)
 
 - ✅ Core validation engine
 - ✅ File format support (CSV, JSON, Parquet)
@@ -240,18 +360,30 @@ cargo test
 - ✅ OpenTelemetry support
 - ✅ Data profiling and constraint suggestions
 
-### Next (v0.0.2)
+### Now (v0.0.2)
+
+- ✅ Advanced analytics (KLL sketches, correlation, mutual information)
+- ✅ Incremental computation framework for streaming data
+- ✅ Metrics repository for historical tracking
+- ✅ Anomaly detection with configurable strategies
+- ✅ Grouped metrics computation for segment analysis
+- ✅ Multi-table validation with foreign key support
+- ✅ SSN and advanced format pattern detection
+- ✅ Comprehensive benchmarking infrastructure
+- ✅ Diátaxis-compliant documentation
+
+### Next (v0.0.3)
 
 - 🔜 Database connectivity (PostgreSQL, MySQL, SQLite)
-- 🔜 Streaming data support
 - 🔜 Python bindings
 - 🔜 Web UI for validation reports
+- 🔜 CLI tool for standalone validation
 
 ### Future
 
-- 🎯 Incremental validation
-- 🎯 Distributed execution
-- 🎯 More language bindings
+- 🎯 Distributed execution on clusters
+- 🎯 Real-time streaming validation
+- 🎯 More language bindings (Java, Go)
 - 🎯 Advanced ML-based anomaly detection
 
 ## 📄 License
