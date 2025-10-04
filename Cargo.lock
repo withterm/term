@@ -722,6 +722,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c74b8349d32d297c9134b8c88677813a227df8f779daa29bfc29c183fe3dca6"
 
 [[package]]
+name = "convert_case"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec182b0ca2f35d8fc196cf3404988fd8b8c739a4d270ff118a398feb0cbec1ca"
+dependencies = [
+ "unicode-segmentation",
+]
+
+[[package]]
 name = "core-foundation"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -876,6 +885,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d02f3b0da4c6504f86e9cd789d8dbafab48c2321be74e9987593de5a894d93d"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "ctor"
+version = "0.2.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32a2785755761f3ddc1492979ce1e48d2c00d09311c39e4466429188f3dd6501"
+dependencies = [
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -1534,7 +1553,8 @@ dependencies = [
 [[package]]
 name = "datafusion-table-providers"
 version = "0.6.3"
-source = "git+https://github.com/datafusion-contrib/datafusion-table-providers.git?tag=v0.6.3#dd29536fee6c6778b97a45264a7a91492fd4e239"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "faa01adf138b743d9261bd7f5a4c11836080f853fb3e0c92a4b2ebeb956decff"
 dependencies = [
  "arrow",
  "arrow-json",
@@ -2445,6 +2465,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a82ae493e598baaea5209805c49bbf2ea7de956d50d7da0da1164f9c6d28543"
 
 [[package]]
+name = "libloading"
+version = "0.8.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d7c4b02199fee7c5d21a5ae7d8cfa79a6ef5bb2fc834d6e9058e89c825efdc55"
+dependencies = [
+ "cfg-if",
+ "windows-link 0.2.0",
+]
+
+[[package]]
 name = "libm"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2690,6 +2720,64 @@ dependencies = [
  "thiserror 2.0.16",
  "time",
  "uuid",
+]
+
+[[package]]
+name = "napi"
+version = "2.16.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "55740c4ae1d8696773c78fdafd5d0e5fe9bc9f1b071c7ba493ba5c413a9184f3"
+dependencies = [
+ "bitflags",
+ "ctor",
+ "napi-derive",
+ "napi-sys",
+ "once_cell",
+ "tokio",
+]
+
+[[package]]
+name = "napi-build"
+version = "2.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dcae8ad5609d14afb3a3b91dee88c757016261b151e9dcecabf1b2a31a6cab14"
+
+[[package]]
+name = "napi-derive"
+version = "2.16.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7cbe2585d8ac223f7d34f13701434b9d5f4eb9c332cccce8dee57ea18ab8ab0c"
+dependencies = [
+ "cfg-if",
+ "convert_case",
+ "napi-derive-backend",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "napi-derive-backend"
+version = "1.0.75"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1639aaa9eeb76e91c6ae66da8ce3e89e921cd3885e99ec85f4abacae72fc91bf"
+dependencies = [
+ "convert_case",
+ "once_cell",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "semver",
+ "syn",
+]
+
+[[package]]
+name = "napi-sys"
+version = "2.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "427802e8ec3a734331fec1035594a210ce1ff4dc5bc1950530920ab717964ea3"
+dependencies = [
+ "libloading",
 ]
 
 [[package]]
@@ -4106,7 +4194,7 @@ dependencies = [
 
 [[package]]
 name = "term-guard"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "arrow",
  "async-trait",
@@ -4139,6 +4227,22 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "zeroize",
+]
+
+[[package]]
+name = "term-guard-node"
+version = "0.1.0"
+dependencies = [
+ "arrow",
+ "datafusion",
+ "napi",
+ "napi-build",
+ "napi-derive",
+ "regex",
+ "serde",
+ "serde_json",
+ "term-guard",
+ "tokio",
 ]
 
 [[package]]

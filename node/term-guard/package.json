@@ -1,0 +1,48 @@
+{
+  "name": "term-guard",
+  "version": "0.1.0",
+  "description": "Data validation library providing Deequ's capabilities without Spark",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "napi": {
+    "name": "term-guard",
+    "triples": {
+      "additional": [
+        "aarch64-apple-darwin",
+        "aarch64-unknown-linux-gnu",
+        "x86_64-apple-darwin",
+        "x86_64-pc-windows-msvc",
+        "x86_64-unknown-linux-gnu"
+      ]
+    }
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@napi-rs/cli": "^2.18.0",
+    "@types/node": "^20.0.0"
+  },
+  "engines": {
+    "node": ">= 16"
+  },
+  "scripts": {
+    "artifacts": "napi artifacts",
+    "build": "napi build --platform --release",
+    "build:debug": "napi build --platform",
+    "prepublishOnly": "napi prepublish -t npm",
+    "test": "node test.js",
+    "version": "napi version"
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "*.node"
+  ],
+  "keywords": [
+    "data-validation",
+    "data-quality",
+    "deequ",
+    "datafusion",
+    "rust",
+    "napi"
+  ]
+}

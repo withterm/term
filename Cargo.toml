@@ -2,6 +2,7 @@
 members = [
   "term-guard",
   "examples",
+  "node/term-guard",
 ]
 resolver = "2"
 
