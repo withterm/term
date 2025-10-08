@@ -55,6 +55,7 @@ export class CheckBuilder {
   build(): Check;
 }
 
+// Legacy DataSource API (kept for compatibility)
 export class DataSource {
   static fromCsv(path: string): Promise<DataSource>;
   static fromParquet(path: string): Promise<DataSource>;
@@ -67,6 +68,119 @@ export class DataSourceBuilder {
   path(path: string): this;
   format(format: string): this;
   build(): Promise<DataSource>;
+}
+
+// New enhanced data source APIs
+export interface CsvOptions {
+  delimiter?: string;
+  hasHeaders?: boolean;
+  skipRows?: number;
+  quoteChar?: string;
+  escapeChar?: string;
+  encoding?: string;
+  maxRecords?: number;
+  nullValue?: string;
+}
+
+export interface JsonOptions {
+  lines?: boolean;
+  maxRecords?: number;
+  schemaInferenceSampleSize?: number;
+}
+
+export interface ParquetOptions {
+  enableStatistics?: boolean;
+  enablePageIndex?: boolean;
+  batchSize?: number;
+  rowGroupSize?: number;
+}
+
+export class FileDataSource {
+  static fromCsv(path: string, options?: CsvOptions): Promise<FileDataSource>;
+  static fromJson(path: string, options?: JsonOptions): Promise<FileDataSource>;
+  static fromParquet(path: string, options?: ParquetOptions): Promise<FileDataSource>;
+  getSchema(): Promise<string[]>;
+  countRows(): Promise<number>;
+}
+
+export class MemoryDataSource {
+  static fromJsonArray(data: string): Promise<MemoryDataSource>;
+  static fromRecords(records: string[]): Promise<MemoryDataSource>;
+  getSchema(): Promise<string[]>;
+  countRows(): Promise<number>;
+  query(sql: string): Promise<string>;
+}
+
+export class DataFusionContext {
+  constructor();
+  registerCsv(tableName: string, path: string, hasHeader?: boolean): Promise<void>;
+  registerParquet(tableName: string, path: string): Promise<void>;
+  registerJson(tableName: string, path: string): Promise<void>;
+  sql(query: string): Promise<string>;
+  execute(query: string): Promise<string[]>;
+  listTables(): string[];
+  getTableSchema(tableName: string): Promise<string[]>;
+  createView(viewName: string, sql: string): Promise<void>;
+  dropTable(tableName: string): Promise<void>;
+  unionTables(resultTable: string, table1: string, table2: string): Promise<void>;
+  joinTables(
+    resultTable: string, 
+    leftTable: string, 
+    rightTable: string, 
+    leftKey: string, 
+    rightKey: string, 
+    joinType?: string
+  ): Promise<void>;
+}
+
+export enum DataSourceType {
+  Csv = "Csv",
+  Json = "Json",
+  Parquet = "Parquet",
+  Memory = "Memory",
+  S3 = "S3",
+  Azure = "Azure",
+  Gcs = "Gcs"
+}
+
+export class UnifiedDataSource {
+  static fromFile(path: string, format?: string): Promise<UnifiedDataSource>;
+  static fromMemory(jsonData: string): Promise<UnifiedDataSource>;
+  sql(query: string): Promise<string>;
+  getSchema(): Promise<string[]>;
+  countRows(): Promise<number>;
+  getSourceType(): string;
+}
+
+// Cloud storage options (only available with cloud-storage feature)
+export interface S3Options {
+  region: string;
+  accessKeyId?: string;
+  secretAccessKey?: string;
+  sessionToken?: string;
+  endpoint?: string;
+  allowHttp?: boolean;
+}
+
+export interface AzureOptions {
+  accountName: string;
+  accessKey?: string;
+  sasToken?: string;
+  containerName: string;
+}
+
+export interface GcsOptions {
+  projectId: string;
+  credentialsPath?: string;
+  bucketName: string;
+}
+
+export class CloudDataSource {
+  static fromS3(path: string, options: S3Options): Promise<CloudDataSource>;
+  static fromAzure(path: string, options: AzureOptions): Promise<CloudDataSource>;
+  static fromGcs(path: string, options: GcsOptions): Promise<CloudDataSource>;
+  getSchema(): Promise<string[]>;
+  getSourceType(): string;
 }
 
 export class ValidationSuite {

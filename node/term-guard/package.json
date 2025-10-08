@@ -2,8 +2,8 @@
   "name": "term-guard",
   "version": "0.1.0",
   "description": "Data validation library providing Deequ's capabilities without Spark",
-  "main": "index.js",
-  "types": "index.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "napi": {
     "name": "term-guard",
     "triples": {
@@ -19,7 +19,9 @@
   "license": "MIT",
   "devDependencies": {
     "@napi-rs/cli": "^2.18.0",
-    "@types/node": "^20.0.0"
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.3",
+    "tsx": "^4.7.0"
   },
   "engines": {
     "node": ">= 16"
@@ -28,13 +30,17 @@
     "artifacts": "napi artifacts",
     "build": "napi build --platform --release",
     "build:debug": "napi build --platform",
-    "prepublishOnly": "napi prepublish -t npm",
-    "test": "node test.js",
+    "build:cloud": "napi build --platform --release --features cloud-storage",
+    "build:ts": "tsc",
+    "prebuild": "npm run build:ts",
+    "prepublishOnly": "napi prepublish -t npm && npm run build:ts",
+    "test": "tsx test.ts && tsx test-data-sources.ts",
+    "test:sources": "tsx test-data-sources.ts",
+    "test:js": "echo 'Error: JavaScript tests are deprecated. Use TypeScript tests instead.' && exit 1",
     "version": "napi version"
   },
   "files": [
-    "index.js",
-    "index.d.ts",
+    "dist/**/*",
     "*.node"
   ],
   "keywords": [

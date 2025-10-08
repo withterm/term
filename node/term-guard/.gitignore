@@ -9,3 +9,14 @@ yarn-error.log*
 .npm
 .yarn-integrity
 artifacts.json
+
+# TypeScript compilation output
+dist/
+*.js
+*.js.map
+*.d.ts
+*.d.ts.map
+
+# Keep TypeScript source files
+!*.ts
+!tsconfig.json

@@ -1,0 +1,26 @@
+# Source files (we only ship compiled)
+*.ts
+!*.d.ts
+tsconfig.json
+
+# Test files
+test*.ts
+test*.js
+__tests__/
+tests/
+
+# Development files
+.gitignore
+.npmignore
+Cargo.toml
+Cargo.lock
+src/
+target/
+build.rs
+
+# Build artifacts
+*.node.d.ts
+artifacts.json
+
+# Keep only the necessary files for npm package
+# dist/ folder and *.node binaries are included via package.json "files" field
