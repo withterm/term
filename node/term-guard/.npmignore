@@ -19,3 +19,7 @@ docs/
 *.log
 .DS_Store
 thumbs.db
+# TypeScript source files
+*.ts
+!*.d.ts
+index.js

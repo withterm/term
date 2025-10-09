@@ -1,10 +1,23 @@
-const test = require('node:test');
-const assert = require('node:assert');
+import test from 'node:test';
+import assert from 'node:assert';
+
+interface TermGuardInfo {
+  name: string;
+  version: string;
+  rustVersion: string;
+}
+
+interface TermGuardModule {
+  helloTerm: () => string;
+  getVersion: () => string;
+  getInfo: () => TermGuardInfo;
+  validateSampleData: () => Promise<string>;
+}
 
 // This will be replaced with the actual module once built
-const termGuard = (() => {
+const termGuard: TermGuardModule = (() => {
   try {
-    return require('../index.js');
+    return require('../index');
   } catch (e) {
     console.log('Module not built yet. Run `npm run build` first.');
     // Return mock functions for CI
