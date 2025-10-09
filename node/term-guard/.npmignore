@@ -1,0 +1,25 @@
+target
+Cargo.lock
+Cargo.toml
+build.rs
+src/
+*.node
+!index.node
+test/
+benches/
+.github/
+.gitignore
+tsconfig.json
+yarn.lock
+package-lock.json
+pnpm-lock.yaml
+.cargo/
+examples/
+docs/
+*.log
+.DS_Store
+thumbs.db
+# TypeScript source files
+*.ts
+!*.d.ts
+index.js

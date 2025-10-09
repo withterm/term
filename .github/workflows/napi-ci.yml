@@ -1,0 +1,82 @@
+name: NAPI-RS CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'node/term-guard/**'
+      - '.github/workflows/napi-ci.yml'
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'node/term-guard/**'
+      - '.github/workflows/napi-ci.yml'
+
+# Prevent concurrent builds from the same branch/PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Minimal permissions by default
+permissions:
+  contents: read
+
+env:
+  DEBUG: napi:*
+  APP_NAME: term-guard
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+
+jobs:
+  build-and-test:
+    name: Build and Test Node.js Bindings
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: node/term-guard/package-lock.json
+      
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      
+      - name: Cache Rust dependencies
+        uses: useblacksmith/rust-cache@v3
+        with:
+          prefix-key: "v2-napi"
+          shared-key: "napi-linux"
+          cache-on-failure: true
+          cache-all-crates: true
+          cache-targets: true
+      
+      - name: Install dependencies
+        run: |
+          cd node/term-guard
+          npm ci
+      
+      - name: Build NAPI module
+        run: |
+          cd node/term-guard
+          npm run build
+      
+      - name: Test NAPI module
+        run: |
+          cd node/term-guard
+          npm test
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/main'
+        with:
+          name: node-bindings
+          path: node/term-guard/*.node
+          if-no-files-found: error

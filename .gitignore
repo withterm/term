@@ -45,3 +45,17 @@ CLAUDE.md
 
 # Logs directory
 logs/
+
+# Node.js dependencies
+node_modules/
+node/term-guard/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+*.tgz
+
+# Node.js build artifacts
+node/term-guard/*.node
+node/term-guard/index.node
+node/term-guard/artifacts.json

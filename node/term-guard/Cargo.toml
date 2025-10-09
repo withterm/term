@@ -1,0 +1,43 @@
+[package]
+name = "term-guard-node"
+version = "0.1.0"
+edition = "2021"
+authors = ["Eric P. Simon <ericpsimon@gmail.com>"]
+license = "MIT"
+description = "Node.js bindings for Term data validation library"
+repository = "https://github.com/withterm/term"
+keywords = ["data-validation", "data-quality", "nodejs", "napi"]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# NAPI dependencies
+napi = { version = "2", default-features = false, features = ["napi8", "async", "serde-json"] }
+napi-derive = "2"
+
+# Term dependency
+term-guard = { path = "../../term-guard", version = "0.0.2" }
+
+# DataFusion and Arrow for data handling
+datafusion = "48.0.1"
+arrow = "55.2"
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+async-trait = "0.1"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Error handling
+thiserror = "2"
+
+[build-dependencies]
+napi-build = "2"
+
+[profile.release]
+lto = true
+strip = true
+opt-level = 3

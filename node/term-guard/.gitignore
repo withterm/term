@@ -1,0 +1,45 @@
+# Node.js dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+
+# Build artifacts
+*.node
+index.node
+artifacts.json
+*.tgz
+
+# TypeScript build files
+*.tsbuildinfo
+dist/
+lib/
+build/
+*.js.map
+*.d.ts.map
+
+# Keep TypeScript source files
+!*.ts
+!tsconfig.json
+
+# Testing
+coverage/
+.nyc_output/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Temporary files
+tmp/
+temp/
