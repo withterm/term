@@ -2,7 +2,8 @@ use crate::types::Level;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use std::sync::Arc;
-use term_guard::core::{Check as CoreCheck, Level as CoreLevel};
+use term_guard::constraints::{Assertion, UniquenessOptions, UniquenessType};
+use term_guard::core::{Check as CoreCheck, ConstraintOptions, Level as CoreLevel};
 
 #[napi]
 pub struct Check {
@@ -13,17 +14,17 @@ pub struct Check {
 impl Check {
     #[napi(getter)]
     pub fn name(&self) -> String {
-        self.inner.name.clone()
+        self.inner.name().to_string()
     }
 
     #[napi(getter)]
     pub fn level(&self) -> Level {
-        self.inner.level.clone().into()
+        self.inner.level().clone().into()
     }
 
     #[napi(getter)]
     pub fn description(&self) -> Option<String> {
-        self.inner.description.clone()
+        self.inner.description().map(|s| s.to_string())
     }
 }
 
@@ -67,9 +68,11 @@ impl CheckBuilder {
 
         let threshold = ratio.unwrap_or(1.0);
         let check = builder
-            .is_complete(&column, threshold)
-            .build()
-            .map_err(|e| Error::from_reason(e.to_string()))?;
+            .completeness(
+                column.as_str(),
+                ConstraintOptions::default().with_threshold(threshold),
+            )
+            .build();
 
         Ok(Check {
             inner: Arc::new(check),
@@ -85,9 +88,8 @@ impl CheckBuilder {
         }
 
         let check = builder
-            .has_min(&column, min_value)
-            .build()
-            .map_err(|e| Error::from_reason(e.to_string()))?;
+            .has_min(column.as_str(), Assertion::GreaterThanOrEqual(min_value))
+            .build();
 
         Ok(Check {
             inner: Arc::new(check),
@@ -103,9 +105,8 @@ impl CheckBuilder {
         }
 
         let check = builder
-            .has_max(&column, max_value)
-            .build()
-            .map_err(|e| Error::from_reason(e.to_string()))?;
+            .has_max(column.as_str(), Assertion::LessThanOrEqual(max_value))
+            .build();
 
         Ok(Check {
             inner: Arc::new(check),
@@ -121,9 +122,12 @@ impl CheckBuilder {
         }
 
         let check = builder
-            .is_unique(&column)
-            .build()
-            .map_err(|e| Error::from_reason(e.to_string()))?;
+            .uniqueness(
+                vec![column.as_str()],
+                UniquenessType::FullUniqueness { threshold: 1.0 },
+                UniquenessOptions::default(),
+            )
+            .build();
 
         Ok(Check {
             inner: Arc::new(check),
@@ -143,11 +147,14 @@ impl CheckBuilder {
             builder = builder.description(desc);
         }
 
-        let tol = tolerance.unwrap_or(0.01);
+        let assertion = if let Some(tol) = tolerance {
+            Assertion::Between(expected - tol, expected + tol)
+        } else {
+            Assertion::Equals(expected)
+        };
         let check = builder
-            .has_mean(&column, expected, tol)
-            .build()
-            .map_err(|e| Error::from_reason(e.to_string()))?;
+            .has_mean(column.as_str(), assertion)
+            .build();
 
         Ok(Check {
             inner: Arc::new(check),
@@ -165,9 +172,8 @@ impl CheckBuilder {
 
         // Default to a simple row count check
         let check = builder
-            .has_size(|size| size > 0)
-            .build()
-            .map_err(|e| Error::from_reason(e.to_string()))?;
+            .has_size(Assertion::GreaterThan(0.0))
+            .build();
 
         Ok(Check {
             inner: Arc::new(check),

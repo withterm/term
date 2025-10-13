@@ -50,15 +50,15 @@ pub async fn validate_sample_data(path: String) -> Result<String> {
     let data_source = DataSource::from_csv(path).await?;
 
     // Create some checks
-    let completeness_check = CheckBuilder::new("completeness_check".to_string())
-        .description("Check for data completeness".to_string())
-        .is_complete("column1".to_string(), Some(0.95))?;
+    let mut builder = CheckBuilder::new("completeness_check".to_string());
+    builder.description("Check for data completeness".to_string());
+    let completeness_check = builder.is_complete("column1".to_string(), Some(0.95))?;
 
-    // Build a validation suite
-    let suite = ValidationSuiteBuilder::new("sample_suite".to_string())
-        .description("Sample validation suite".to_string())
-        .add_check(&completeness_check)
-        .build()?;
+    // Build a validation suite  
+    let mut suite_builder = ValidationSuiteBuilder::new("sample_suite".to_string());
+    suite_builder.description("Sample validation suite".to_string());
+    suite_builder.add_check(&completeness_check);
+    let suite = suite_builder.build()?;
 
     // Run the validation
     let result = suite.run(&data_source).await?;

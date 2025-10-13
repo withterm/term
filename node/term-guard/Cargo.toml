@@ -36,8 +36,3 @@ thiserror = "2"
 
 [build-dependencies]
 napi-build = "2"
-
-[profile.release]
-lto = true
-strip = true
-opt-level = 3

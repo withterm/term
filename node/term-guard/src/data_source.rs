@@ -124,21 +124,21 @@ impl DataSourceBuilder {
     }
 
     #[napi]
-    pub async fn register_parquet(&mut self, name: String, path: String) -> Result<&Self> {
+    pub async unsafe fn register_parquet(&mut self, name: String, path: String) -> Result<()> {
         self.ctx
             .register_parquet(&name, &path, ParquetReadOptions::default())
             .await
             .map_err(|e| Error::from_reason(format!("Failed to register parquet: {}", e)))?;
-        Ok(self)
+        Ok(())
     }
 
     #[napi]
-    pub async fn register_csv(&mut self, name: String, path: String) -> Result<&Self> {
+    pub async unsafe fn register_csv(&mut self, name: String, path: String) -> Result<()> {
         self.ctx
             .register_csv(&name, &path, CsvReadOptions::default())
             .await
             .map_err(|e| Error::from_reason(format!("Failed to register CSV: {}", e)))?;
-        Ok(self)
+        Ok(())
     }
 
     #[napi]

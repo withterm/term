@@ -1,12 +1,11 @@
 use crate::check::Check;
 use crate::data_source::DataSource;
 use crate::types::{PerformanceMetrics, ValidationIssue, ValidationReport, ValidationResult};
-use datafusion::prelude::SessionContext;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use std::sync::Arc;
 use std::time::Instant;
-use term_guard::core::{ValidationReport as CoreReport, ValidationSuite as CoreValidationSuite};
+use term_guard::core::ValidationSuite as CoreValidationSuite;
 
 #[napi]
 pub struct ValidationSuite {
@@ -22,12 +21,12 @@ impl ValidationSuite {
 
     #[napi(getter)]
     pub fn name(&self) -> String {
-        self.inner.name.clone()
+        self.inner.name().to_string()
     }
 
     #[napi(getter)]
     pub fn description(&self) -> Option<String> {
-        self.inner.description.clone()
+        self.inner.description().map(|s| s.to_string())
     }
 
     #[napi]
@@ -38,7 +37,7 @@ impl ValidationSuite {
         let ctx = data.get_context().await?;
 
         // Run the validation suite
-        let report = self
+        let result = self
             .inner
             .run(&ctx)
             .await
@@ -47,8 +46,8 @@ impl ValidationSuite {
         let duration = start.elapsed();
         let duration_ms = duration.as_secs_f64() * 1000.0;
 
-        // Convert the core report to our NAPI types
-        let validation_report = convert_report(&report);
+        // Convert the core result to our NAPI types
+        let validation_report = convert_result(&result);
 
         let metrics = Some(PerformanceMetrics {
             total_duration_ms: duration_ms,
@@ -72,7 +71,7 @@ impl ValidationSuite {
 
     #[napi(getter)]
     pub fn check_count(&self) -> u32 {
-        self.inner.checks.len() as u32
+        self.inner.checks().len() as u32
     }
 }
 
@@ -123,12 +122,11 @@ impl ValidationSuiteBuilder {
         }
 
         for check in &self.checks {
-            builder = builder.add_check_arc(check.clone());
+            // Convert Arc<Check> to Check by dereferencing
+            builder = builder.check(check.as_ref().clone());
         }
 
-        let suite = builder
-            .build()
-            .map_err(|e| Error::from_reason(e.to_string()))?;
+        let suite = builder.build();
 
         Ok(ValidationSuite {
             inner: Arc::new(suite),
@@ -136,33 +134,28 @@ impl ValidationSuiteBuilder {
     }
 }
 
-fn convert_report(report: &CoreReport) -> ValidationReport {
+fn convert_result(result: &term_guard::core::ValidationResult) -> ValidationReport {
+    use term_guard::core::ValidationResult;
+    
+    let report = match result {
+        ValidationResult::Success { report, .. } => report,
+        ValidationResult::Failure { report } => report,
+    };
+    
+    // Convert issues from the report
     let issues: Vec<ValidationIssue> = report
-        .check_results
+        .issues
         .iter()
-        .filter_map(|result| {
-            if result.status != term_guard::core::ConstraintStatus::Success {
-                Some(ValidationIssue {
-                    check_name: result.check_name.clone(),
-                    level: format!("{:?}", result.level),
-                    message: result
-                        .message
-                        .clone()
-                        .unwrap_or_else(|| format!("Check {} failed", result.check_name)),
-                })
-            } else {
-                None
-            }
+        .map(|issue| ValidationIssue {
+            check_name: issue.check_name.clone(),
+            level: format!("{:?}", issue.level),
+            message: issue.message.clone(),
         })
         .collect();
 
-    let total = report.check_results.len() as u32;
-    let passed = report
-        .check_results
-        .iter()
-        .filter(|r| r.status == term_guard::core::ConstraintStatus::Success)
-        .count() as u32;
-    let failed = total - passed;
+    let total = report.metrics.total_checks as u32;
+    let passed = report.metrics.passed_checks as u32;
+    let failed = report.metrics.failed_checks as u32;
 
     ValidationReport {
         suite_name: report.suite_name.clone(),

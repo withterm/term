@@ -1,4 +1,3 @@
-use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use term_guard::core::{ConstraintStatus as CoreStatus, Level as CoreLevel};
 
