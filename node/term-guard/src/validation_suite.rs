@@ -136,12 +136,12 @@ impl ValidationSuiteBuilder {
 
 fn convert_result(result: &term_guard::core::ValidationResult) -> ValidationReport {
     use term_guard::core::ValidationResult;
-    
+
     let report = match result {
         ValidationResult::Success { report, .. } => report,
         ValidationResult::Failure { report } => report,
     };
-    
+
     // Convert issues from the report
     let issues: Vec<ValidationIssue> = report
         .issues

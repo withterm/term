@@ -278,4 +278,6 @@ value3,300`;
   }
 });
 
+// Log test completion before Node process cleanup
 console.log('All tests completed successfully!');
+

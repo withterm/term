@@ -49,7 +49,7 @@
     "build:debug": "napi build --platform",
     "prebuild": "npm run build:ts",
     "prepublishOnly": "napi prepublish -t npm && npm run build:ts",
-    "test": "tsx test/index.test.ts",
+    "test": "node test/run-tests.js",
     "universal": "napi universal",
     "version": "napi version"
   },

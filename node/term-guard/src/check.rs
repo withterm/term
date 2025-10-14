@@ -152,9 +152,7 @@ impl CheckBuilder {
         } else {
             Assertion::Equals(expected)
         };
-        let check = builder
-            .has_mean(column.as_str(), assertion)
-            .build();
+        let check = builder.has_mean(column.as_str(), assertion).build();
 
         Ok(Check {
             inner: Arc::new(check),
@@ -171,9 +169,7 @@ impl CheckBuilder {
         }
 
         // Default to a simple row count check
-        let check = builder
-            .has_size(Assertion::GreaterThan(0.0))
-            .build();
+        let check = builder.has_size(Assertion::GreaterThan(0.0)).build();
 
         Ok(Check {
             inner: Arc::new(check),

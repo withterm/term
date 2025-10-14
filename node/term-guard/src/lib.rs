@@ -54,7 +54,7 @@ pub async fn validate_sample_data(path: String) -> Result<String> {
     builder.description("Check for data completeness".to_string());
     let completeness_check = builder.is_complete("column1".to_string(), Some(0.95))?;
 
-    // Build a validation suite  
+    // Build a validation suite
     let mut suite_builder = ValidationSuiteBuilder::new("sample_suite".to_string());
     suite_builder.description("Sample validation suite".to_string());
     suite_builder.add_check(&completeness_check);
