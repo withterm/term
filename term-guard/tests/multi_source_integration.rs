@@ -112,9 +112,13 @@ async fn test_foreign_key_validation_across_sources() -> Result<(), Box<dyn std:
     match result {
         ValidationResult::Failure { report } => {
             assert_eq!(report.issues.len(), 1);
-            assert!(report.issues[0]
-                .message
-                .contains("Foreign key constraint violation"));
+            assert!(
+                report.issues[0]
+                    .message
+                    .contains("Foreign key constraint violation"),
+                "Expected message to contain 'Foreign key constraint violation' but got: {}",
+                report.issues[0].message
+            );
             assert!(report.issues[0].message.contains("1 values")); // One violation
         }
         _ => panic!("Expected validation to fail due to foreign key violation"),
@@ -199,7 +203,9 @@ async fn test_join_coverage_validation() -> Result<(), Box<dyn std::error::Error
             assert_eq!(report.metrics.total_checks, 1);
             assert_eq!(report.metrics.passed_checks, 1);
         }
-        _ => panic!("Expected validation to succeed with 83% coverage"),
+        ValidationResult::Failure { report } => {
+            panic!("Expected validation to succeed with 83% coverage, but got failure with issues: {:?}", report.issues);
+        }
     }
 
     Ok(())
