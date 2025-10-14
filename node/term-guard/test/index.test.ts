@@ -278,6 +278,9 @@ value3,300`;
   }
 });
 
+// Temporary test to verify failure handling
+// assert.fail('Testing failure handling');
+
 // Log test completion before Node process cleanup
 console.log('All tests completed successfully!');
 
