@@ -19,7 +19,7 @@ impl Check {
 
     #[napi(getter)]
     pub fn level(&self) -> Level {
-        self.inner.level().clone().into()
+        self.inner.level().into()
     }
 
     #[napi(getter)]
@@ -60,7 +60,7 @@ impl CheckBuilder {
 
     #[napi]
     pub fn is_complete(&mut self, column: String, ratio: Option<f64>) -> Result<Check> {
-        let mut builder = CoreCheck::builder(&self.name).level(self.level.clone());
+        let mut builder = CoreCheck::builder(&self.name).level(self.level);
 
         if let Some(desc) = &self.description {
             builder = builder.description(desc);
@@ -81,7 +81,7 @@ impl CheckBuilder {
 
     #[napi]
     pub fn has_min(&mut self, column: String, min_value: f64) -> Result<Check> {
-        let mut builder = CoreCheck::builder(&self.name).level(self.level.clone());
+        let mut builder = CoreCheck::builder(&self.name).level(self.level);
 
         if let Some(desc) = &self.description {
             builder = builder.description(desc);
@@ -98,7 +98,7 @@ impl CheckBuilder {
 
     #[napi]
     pub fn has_max(&mut self, column: String, max_value: f64) -> Result<Check> {
-        let mut builder = CoreCheck::builder(&self.name).level(self.level.clone());
+        let mut builder = CoreCheck::builder(&self.name).level(self.level);
 
         if let Some(desc) = &self.description {
             builder = builder.description(desc);
@@ -115,7 +115,7 @@ impl CheckBuilder {
 
     #[napi]
     pub fn is_unique(&mut self, column: String) -> Result<Check> {
-        let mut builder = CoreCheck::builder(&self.name).level(self.level.clone());
+        let mut builder = CoreCheck::builder(&self.name).level(self.level);
 
         if let Some(desc) = &self.description {
             builder = builder.description(desc);
@@ -141,7 +141,7 @@ impl CheckBuilder {
         expected: f64,
         tolerance: Option<f64>,
     ) -> Result<Check> {
-        let mut builder = CoreCheck::builder(&self.name).level(self.level.clone());
+        let mut builder = CoreCheck::builder(&self.name).level(self.level);
 
         if let Some(desc) = &self.description {
             builder = builder.description(desc);
@@ -162,7 +162,7 @@ impl CheckBuilder {
     #[napi]
     pub fn build(&mut self) -> Result<Check> {
         // Generic build for simple checks
-        let mut builder = CoreCheck::builder(&self.name).level(self.level.clone());
+        let mut builder = CoreCheck::builder(&self.name).level(self.level);
 
         if let Some(desc) = &self.description {
             builder = builder.description(desc);

@@ -19,7 +19,7 @@ impl DataSource {
         // Register the parquet file as a table
         ctx.register_parquet("data", &path, ParquetReadOptions::default())
             .await
-            .map_err(|e| Error::from_reason(format!("Failed to read parquet file: {}", e)))?;
+            .map_err(|e| Error::from_reason(format!("Failed to read parquet file: {e}")))?;
 
         Ok(DataSource {
             ctx: Arc::new(Mutex::new(ctx)),
@@ -34,7 +34,7 @@ impl DataSource {
         // Register the CSV file as a table
         ctx.register_csv("data", &path, CsvReadOptions::default())
             .await
-            .map_err(|e| Error::from_reason(format!("Failed to read CSV file: {}", e)))?;
+            .map_err(|e| Error::from_reason(format!("Failed to read CSV file: {e}")))?;
 
         Ok(DataSource {
             ctx: Arc::new(Mutex::new(ctx)),
@@ -49,7 +49,7 @@ impl DataSource {
         // Register the JSON file as a table
         ctx.register_json("data", &path, NdJsonReadOptions::default())
             .await
-            .map_err(|e| Error::from_reason(format!("Failed to read JSON file: {}", e)))?;
+            .map_err(|e| Error::from_reason(format!("Failed to read JSON file: {e}")))?;
 
         Ok(DataSource {
             ctx: Arc::new(Mutex::new(ctx)),
@@ -76,9 +76,7 @@ impl DataSource {
                 .as_any()
                 .downcast_ref::<arrow::array::Int64Array>()
             {
-                if let Some(count) = col.value(0).try_into().ok() {
-                    return Ok(count);
-                }
+                return Ok(col.value(0));
             }
         }
 
@@ -115,29 +113,48 @@ pub struct DataSourceBuilder {
 }
 
 #[napi]
-impl DataSourceBuilder {
-    #[napi(constructor)]
-    pub fn new() -> Self {
+impl Default for DataSourceBuilder {
+    fn default() -> Self {
         DataSourceBuilder {
             ctx: SessionContext::new(),
         }
     }
+}
 
+#[napi]
+impl DataSourceBuilder {
+    #[napi(constructor)]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register a Parquet file as a table in the data source.
+    ///
+    /// # Safety
+    ///
+    /// This function is marked unsafe because NAPI-RS requires it for async methods that
+    /// take &mut self. The function itself is safe to call.
     #[napi]
     pub async unsafe fn register_parquet(&mut self, name: String, path: String) -> Result<()> {
         self.ctx
             .register_parquet(&name, &path, ParquetReadOptions::default())
             .await
-            .map_err(|e| Error::from_reason(format!("Failed to register parquet: {}", e)))?;
+            .map_err(|e| Error::from_reason(format!("Failed to register parquet: {e}")))?;
         Ok(())
     }
 
+    /// Register a CSV file as a table in the data source.
+    ///
+    /// # Safety
+    ///
+    /// This function is marked unsafe because NAPI-RS requires it for async methods that
+    /// take &mut self. The function itself is safe to call.
     #[napi]
     pub async unsafe fn register_csv(&mut self, name: String, path: String) -> Result<()> {
         self.ctx
             .register_csv(&name, &path, CsvReadOptions::default())
             .await
-            .map_err(|e| Error::from_reason(format!("Failed to register CSV: {}", e)))?;
+            .map_err(|e| Error::from_reason(format!("Failed to register CSV: {e}")))?;
         Ok(())
     }
 
