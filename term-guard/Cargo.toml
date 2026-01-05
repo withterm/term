@@ -50,7 +50,7 @@ hex = "0.4"
 num_cpus = "1.16"
 object_store = {version = "0.12", optional = true}
 once_cell = "1.18"
-opentelemetry = {version = "0.30", optional = true}
+opentelemetry = {version = "0.31", optional = true}
 opentelemetry_sdk = {version = "0.30", optional = true}
 parquet = {version = "55.2", optional = true}
 rand = {version = "0.9", optional = true}
