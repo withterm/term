@@ -282,7 +282,7 @@ pub mod setup {
         _tracer: T,
     ) -> Result<(), Box<dyn std::error::Error>>
     where
-        T: tracing_opentelemetry::PreSampledTracer + opentelemetry::trace::Tracer + 'static,
+        T: opentelemetry::trace::Tracer + 'static,
     {
         // TODO: This function needs to be updated for compatibility with tracing-opentelemetry 0.26
         // The layer composition is causing type inference issues. For now, users should
