@@ -5,4 +5,7 @@
 
 mod types;
 
-pub use types::CloudConfig;
+pub use types::{
+    CloudConfig, CloudHistogram, CloudHistogramBucket, CloudMetadata, CloudMetric,
+    CloudMetricValue, CloudResultKey, CloudValidationIssue, CloudValidationResult,
+};
