@@ -7,6 +7,7 @@ mod buffer;
 mod client;
 mod error;
 mod types;
+mod worker;
 
 pub use buffer::{BufferEntry, MetricsBuffer};
 pub use client::{
@@ -17,3 +18,4 @@ pub use types::{
     CloudConfig, CloudHistogram, CloudHistogramBucket, CloudMetadata, CloudMetric,
     CloudMetricValue, CloudResultKey, CloudValidationIssue, CloudValidationResult,
 };
+pub use worker::{UploadWorker, WorkerStats};
