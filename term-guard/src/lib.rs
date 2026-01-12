@@ -166,6 +166,8 @@
 //! ```
 
 pub mod analyzers;
+#[cfg(feature = "cloud")]
+pub mod cloud;
 pub mod constraints;
 pub mod core;
 pub mod error;
