@@ -3,8 +3,10 @@
 //! This module provides integration with the Term Cloud platform,
 //! enabling centralized metrics storage, alerting, and historical analysis.
 
+mod error;
 mod types;
 
+pub use error::{CloudError, CloudResult};
 pub use types::{
     CloudConfig, CloudHistogram, CloudHistogramBucket, CloudMetadata, CloudMetric,
     CloudMetricValue, CloudResultKey, CloudValidationIssue, CloudValidationResult,
