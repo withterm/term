@@ -3,10 +3,12 @@
 //! This module provides integration with the Term Cloud platform,
 //! enabling centralized metrics storage, alerting, and historical analysis.
 
+mod buffer;
 mod client;
 mod error;
 mod types;
 
+pub use buffer::{BufferEntry, MetricsBuffer};
 pub use client::{
     HealthResponse, IngestResponse, MetricsQuery, MetricsResponse, Pagination, TermCloudClient,
 };
