@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
 use std::sync::Arc;
+use std::time::Instant;
 use tokio::sync::Mutex;
 
 use crate::cloud::{CloudError, CloudMetric, CloudResult};
@@ -9,7 +10,8 @@ use crate::cloud::{CloudError, CloudMetric, CloudResult};
 pub struct BufferEntry {
     pub metric: CloudMetric,
     pub retry_count: u32,
-    pub queued_at: std::time::Instant,
+    pub queued_at: Instant,
+    pub ready_at: Instant,
 }
 
 /// In-memory buffer for pending metrics uploads.
@@ -38,17 +40,22 @@ impl MetricsBuffer {
             });
         }
 
+        let now = Instant::now();
         entries.push_back(BufferEntry {
             metric,
             retry_count: 0,
-            queued_at: std::time::Instant::now(),
+            queued_at: now,
+            ready_at: now,
         });
 
         Ok(())
     }
 
-    /// Push a metric for retry (increments retry count).
-    pub async fn push_retry(&self, mut entry: BufferEntry) -> CloudResult<()> {
+    /// Push a metric for retry with a backoff delay.
+    ///
+    /// Increments retry count and sets `ready_at` to delay processing until
+    /// the backoff period has elapsed.
+    pub async fn push_retry(&self, mut entry: BufferEntry, ready_at: Instant) -> CloudResult<()> {
         let mut entries = self.entries.lock().await;
 
         if entries.len() >= self.max_size {
@@ -59,16 +66,34 @@ impl MetricsBuffer {
         }
 
         entry.retry_count += 1;
+        entry.ready_at = ready_at;
         entries.push_back(entry);
 
         Ok(())
     }
 
-    /// Drain up to `count` entries from the buffer.
+    /// Drain up to `count` ready entries from the buffer.
+    ///
+    /// Only drains entries where `ready_at` has passed, respecting backoff delays
+    /// for retried entries. Entries not yet ready remain in the buffer.
     pub async fn drain(&self, count: usize) -> Vec<BufferEntry> {
         let mut entries = self.entries.lock().await;
-        let drain_count = std::cmp::min(count, entries.len());
-        entries.drain(..drain_count).collect()
+        let now = Instant::now();
+
+        let mut result = Vec::with_capacity(count);
+        let mut i = 0;
+
+        while i < entries.len() && result.len() < count {
+            if entries[i].ready_at <= now {
+                if let Some(entry) = entries.remove(i) {
+                    result.push(entry);
+                }
+            } else {
+                i += 1;
+            }
+        }
+
+        result
     }
 
     /// Get the current number of entries in the buffer.
@@ -160,7 +185,10 @@ mod tests {
         let entry = drained.pop().unwrap();
         assert_eq!(entry.retry_count, 0);
 
-        buffer.push_retry(entry).await.unwrap();
+        buffer
+            .push_retry(entry, std::time::Instant::now())
+            .await
+            .unwrap();
         let mut drained = buffer.drain(1).await;
         let entry = drained.pop().unwrap();
         assert_eq!(entry.retry_count, 1);
@@ -209,5 +237,49 @@ mod tests {
 
         buffer.push(make_test_metric()).await.unwrap();
         assert!(!buffer.is_empty().await);
+    }
+
+    #[tokio::test]
+    async fn test_drain_respects_ready_at() {
+        use std::time::Duration;
+
+        let buffer = MetricsBuffer::new(10);
+
+        buffer.push(make_test_metric()).await.unwrap();
+        let mut drained = buffer.drain(1).await;
+        let entry = drained.pop().unwrap();
+
+        let future_ready = Instant::now() + Duration::from_secs(60);
+        buffer.push_retry(entry, future_ready).await.unwrap();
+
+        assert_eq!(buffer.len().await, 1);
+        let drained = buffer.drain(10).await;
+        assert_eq!(drained.len(), 0);
+        assert_eq!(buffer.len().await, 1);
+    }
+
+    #[tokio::test]
+    async fn test_drain_returns_ready_entries_only() {
+        use std::time::Duration;
+
+        let buffer = MetricsBuffer::new(10);
+
+        buffer.push(make_test_metric()).await.unwrap();
+        buffer.push(make_test_metric()).await.unwrap();
+
+        let mut drained = buffer.drain(2).await;
+        let entry1 = drained.pop().unwrap();
+        let entry2 = drained.pop().unwrap();
+
+        buffer.push_retry(entry1, Instant::now()).await.unwrap();
+        buffer
+            .push_retry(entry2, Instant::now() + Duration::from_secs(60))
+            .await
+            .unwrap();
+
+        assert_eq!(buffer.len().await, 2);
+        let drained = buffer.drain(10).await;
+        assert_eq!(drained.len(), 1);
+        assert_eq!(buffer.len().await, 1);
     }
 }

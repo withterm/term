@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use rand::Rng;
 use tokio::sync::watch;
@@ -137,16 +137,21 @@ impl UploadWorker {
         }
     }
 
-    /// Handle retrying failed entries.
+    /// Handle retrying failed entries with exponential backoff.
     ///
-    /// Re-queues entries immediately without blocking. The buffer's flush_interval
-    /// provides natural throttling, and exponential backoff is applied based on
-    /// each entry's retry count when it's eventually processed again.
-    async fn handle_retry(&mut self, entries: Vec<BufferEntry>, _error: &CloudError) {
+    /// Re-queues entries with a `ready_at` timestamp calculated via exponential
+    /// backoff. The buffer's `drain()` method respects this timestamp, ensuring
+    /// entries are not retried until their backoff period has elapsed.
+    async fn handle_retry(&mut self, entries: Vec<BufferEntry>, error: &CloudError) {
+        let retry_after = error.retry_after();
+
         for entry in entries {
             if entry.retry_count < self.max_retries {
+                let backoff = self.calculate_backoff(entry.retry_count, retry_after);
+                let ready_at = Instant::now() + backoff;
+
                 self.stats.retries += 1;
-                if let Err(e) = self.buffer.push_retry(entry).await {
+                if let Err(e) = self.buffer.push_retry(entry, ready_at).await {
                     warn!("Failed to requeue metric for retry: {}", e);
                     self.stats.metrics_failed += 1;
                 }
@@ -161,7 +166,6 @@ impl UploadWorker {
     ///
     /// Uses the formula: base_delay * 2^retry_count + jitter
     /// where retry_count is capped at 5 (max 32x multiplier).
-    #[allow(dead_code)]
     fn calculate_backoff(&self, retry_count: u32, retry_after: Option<u64>) -> Duration {
         let base_delay = retry_after.unwrap_or(1);
         let capped_retry = retry_count.min(5);
