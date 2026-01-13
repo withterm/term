@@ -4,12 +4,14 @@
 //! enabling centralized metrics storage, alerting, and historical analysis.
 
 mod buffer;
+mod cache;
 mod client;
 mod error;
 mod types;
 mod worker;
 
 pub use buffer::{BufferEntry, MetricsBuffer};
+pub use cache::OfflineCache;
 pub use client::{
     HealthResponse, IngestResponse, MetricsQuery, MetricsResponse, Pagination, TermCloudClient,
 };
