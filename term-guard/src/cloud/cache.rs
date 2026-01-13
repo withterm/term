@@ -118,23 +118,21 @@ impl OfflineCache {
                 message: format!("Failed to query metrics: {e}"),
             })?
             .filter_map(|result| match result {
-                Ok((id, json, retry_count)) => {
-                    match serde_json::from_str::<CloudMetric>(&json) {
-                        Ok(metric) => Some(CacheEntry {
-                            id,
-                            entry: BufferEntry {
-                                metric,
-                                retry_count,
-                                queued_at: now,
-                                ready_at: now,
-                            },
-                        }),
-                        Err(e) => {
-                            warn!("Failed to deserialize cached metric (id={}): {}", id, e);
-                            None
-                        }
+                Ok((id, json, retry_count)) => match serde_json::from_str::<CloudMetric>(&json) {
+                    Ok(metric) => Some(CacheEntry {
+                        id,
+                        entry: BufferEntry {
+                            metric,
+                            retry_count,
+                            queued_at: now,
+                            ready_at: now,
+                        },
+                    }),
+                    Err(e) => {
+                        warn!("Failed to deserialize cached metric (id={}): {}", id, e);
+                        None
                     }
-                }
+                },
                 Err(e) => {
                     warn!("Failed to read cache row: {}", e);
                     None

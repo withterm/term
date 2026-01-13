@@ -245,9 +245,11 @@ impl TermCloudRepository {
     pub async fn shutdown(&self) -> CloudResult<Option<WorkerStats>> {
         info!("Initiating graceful shutdown");
 
-        self.shutdown_tx.send(true).map_err(|e| CloudError::Configuration {
-            message: format!("Failed to send shutdown signal: {e}"),
-        })?;
+        self.shutdown_tx
+            .send(true)
+            .map_err(|e| CloudError::Configuration {
+                message: format!("Failed to send shutdown signal: {e}"),
+            })?;
 
         let stats = if let Some(ref handle_lock) = self.worker_handle {
             let mut guard = handle_lock.write().await;
@@ -323,9 +325,12 @@ impl TermCloudRepository {
     /// ```
     #[instrument(skip(self))]
     pub async fn sync_offline_cache(&self) -> CloudResult<usize> {
-        let cache = self.cache.as_ref().ok_or_else(|| CloudError::Configuration {
-            message: "Offline cache not configured".to_string(),
-        })?;
+        let cache = self
+            .cache
+            .as_ref()
+            .ok_or_else(|| CloudError::Configuration {
+                message: "Offline cache not configured".to_string(),
+            })?;
 
         let entries = cache.load_all()?;
         if entries.is_empty() {
@@ -374,8 +379,8 @@ impl TermCloudRepository {
                 MetricValue::Long(v) => CloudMetricValue::Long(*v),
                 MetricValue::String(v) => CloudMetricValue::String(v.clone()),
                 MetricValue::Boolean(v) => CloudMetricValue::Boolean(*v),
-                MetricValue::Histogram(h) => CloudMetricValue::Histogram(
-                    crate::cloud::CloudHistogram {
+                MetricValue::Histogram(h) => {
+                    CloudMetricValue::Histogram(crate::cloud::CloudHistogram {
                         buckets: h
                             .buckets
                             .iter()
@@ -390,8 +395,8 @@ impl TermCloudRepository {
                         max: h.max,
                         mean: h.mean,
                         std_dev: h.std_dev,
-                    },
-                ),
+                    })
+                }
                 MetricValue::Vector(_) | MetricValue::Map(_) => {
                     continue;
                 }
@@ -481,9 +486,10 @@ impl MetricsRepository for TermCloudRepository {
 
         let cloud_metric = Self::to_cloud_metric(&key, &metrics);
 
-        self.buffer.push(cloud_metric).await.map_err(|e| {
-            TermError::repository("term_cloud", "save", e.to_string())
-        })?;
+        self.buffer
+            .push(cloud_metric)
+            .await
+            .map_err(|e| TermError::repository("term_cloud", "save", e.to_string()))?;
 
         debug!("Metric queued for upload");
         Ok(())
@@ -517,7 +523,11 @@ impl MetricsRepository for TermCloudRepository {
     #[instrument(skip(self))]
     async fn metadata(&self) -> Result<RepositoryMetadata> {
         let pending = self.buffer.len().await;
-        let cached = self.cache.as_ref().map(|c| c.count().unwrap_or(0)).unwrap_or(0);
+        let cached = self
+            .cache
+            .as_ref()
+            .map(|c| c.count().unwrap_or(0))
+            .unwrap_or(0);
 
         Ok(RepositoryMetadata::new("term_cloud")
             .with_config("endpoint", self.config.endpoint())
@@ -562,9 +572,7 @@ impl MetricsRepository for TermCloudQueryAdapter {
         Ok(response
             .results
             .into_iter()
-            .map(|m| {
-                ResultKey::new(m.result_key.dataset_date).with_tags(m.result_key.tags)
-            })
+            .map(|m| ResultKey::new(m.result_key.dataset_date).with_tags(m.result_key.tags))
             .collect())
     }
 
@@ -703,8 +711,14 @@ mod tests {
         let cloud_metric = TermCloudRepository::to_cloud_metric(&key, &context);
 
         assert_eq!(cloud_metric.result_key.dataset_date, 1704931200000);
-        assert_eq!(cloud_metric.result_key.tags.get("env"), Some(&"prod".to_string()));
-        assert_eq!(cloud_metric.metadata.dataset_name, Some("test_dataset".to_string()));
+        assert_eq!(
+            cloud_metric.result_key.tags.get("env"),
+            Some(&"prod".to_string())
+        );
+        assert_eq!(
+            cloud_metric.metadata.dataset_name,
+            Some("test_dataset".to_string())
+        );
         assert!(cloud_metric.metrics.contains_key("completeness.col1"));
         assert!(cloud_metric.metrics.contains_key("size"));
         assert!(cloud_metric.metrics.contains_key("is_valid"));

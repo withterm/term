@@ -45,3 +45,6 @@ CLAUDE.md
 
 # Logs directory
 logs/
+
+# Implementation plans (not checked in)
+docs/plans/
