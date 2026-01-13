@@ -11,7 +11,7 @@ mod types;
 mod worker;
 
 pub use buffer::{BufferEntry, MetricsBuffer};
-pub use cache::OfflineCache;
+pub use cache::{CacheEntry, OfflineCache};
 pub use client::{
     HealthResponse, IngestResponse, MetricsQuery, MetricsResponse, Pagination, TermCloudClient,
 };

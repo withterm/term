@@ -5,8 +5,18 @@ use std::sync::Mutex;
 use std::time::Instant;
 
 use rusqlite::Connection;
+use tracing::warn;
 
 use crate::cloud::{BufferEntry, CloudError, CloudMetric, CloudResult};
+
+/// Entry loaded from the cache, with its database ID for selective deletion.
+#[derive(Debug)]
+pub struct CacheEntry {
+    /// Database ID for this entry, used with `delete_ids()`.
+    pub id: i64,
+    /// The buffered metric entry.
+    pub entry: BufferEntry,
+}
 
 /// SQLite-backed offline cache for metrics persistence.
 pub struct OfflineCache {
@@ -83,13 +93,15 @@ impl OfflineCache {
     }
 
     /// Load all pending metrics from the cache.
-    pub fn load_all(&self) -> CloudResult<Vec<BufferEntry>> {
+    ///
+    /// Returns entries with their database IDs for selective deletion after successful upload.
+    pub fn load_all(&self) -> CloudResult<Vec<CacheEntry>> {
         let conn = self.conn.lock().map_err(|e| CloudError::CacheError {
             message: format!("Failed to acquire lock: {e}"),
         })?;
 
         let mut stmt = conn
-            .prepare("SELECT metric_json, retry_count FROM pending_metrics ORDER BY id")
+            .prepare("SELECT id, metric_json, retry_count FROM pending_metrics ORDER BY id")
             .map_err(|e| CloudError::CacheError {
                 message: format!("Failed to prepare query: {e}"),
             })?;
@@ -97,28 +109,71 @@ impl OfflineCache {
         let now = Instant::now();
         let entries = stmt
             .query_map([], |row| {
-                let metric_json: String = row.get(0)?;
-                let retry_count: u32 = row.get(1)?;
-                Ok((metric_json, retry_count))
+                let id: i64 = row.get(0)?;
+                let metric_json: String = row.get(1)?;
+                let retry_count: u32 = row.get(2)?;
+                Ok((id, metric_json, retry_count))
             })
             .map_err(|e| CloudError::CacheError {
                 message: format!("Failed to query metrics: {e}"),
             })?
-            .filter_map(|result| {
-                result.ok().and_then(|(json, retry_count)| {
-                    serde_json::from_str::<CloudMetric>(&json)
-                        .ok()
-                        .map(|metric| BufferEntry {
-                            metric,
-                            retry_count,
-                            queued_at: now,
-                            ready_at: now,
-                        })
-                })
+            .filter_map(|result| match result {
+                Ok((id, json, retry_count)) => {
+                    match serde_json::from_str::<CloudMetric>(&json) {
+                        Ok(metric) => Some(CacheEntry {
+                            id,
+                            entry: BufferEntry {
+                                metric,
+                                retry_count,
+                                queued_at: now,
+                                ready_at: now,
+                            },
+                        }),
+                        Err(e) => {
+                            warn!("Failed to deserialize cached metric (id={}): {}", id, e);
+                            None
+                        }
+                    }
+                }
+                Err(e) => {
+                    warn!("Failed to read cache row: {}", e);
+                    None
+                }
             })
             .collect();
 
         Ok(entries)
+    }
+
+    /// Delete specific entries by their database IDs.
+    ///
+    /// Returns the number of entries deleted.
+    pub fn delete_ids(&self, ids: &[i64]) -> CloudResult<usize> {
+        if ids.is_empty() {
+            return Ok(0);
+        }
+
+        let conn = self.conn.lock().map_err(|e| CloudError::CacheError {
+            message: format!("Failed to acquire lock: {e}"),
+        })?;
+
+        let placeholders: Vec<_> = ids.iter().map(|_| "?").collect();
+        let sql = format!(
+            "DELETE FROM pending_metrics WHERE id IN ({})",
+            placeholders.join(", ")
+        );
+
+        let mut stmt = conn.prepare(&sql).map_err(|e| CloudError::CacheError {
+            message: format!("Failed to prepare delete query: {e}"),
+        })?;
+
+        let deleted = stmt
+            .execute(rusqlite::params_from_iter(ids.iter()))
+            .map_err(|e| CloudError::CacheError {
+                message: format!("Failed to delete metrics: {e}"),
+            })?;
+
+        Ok(deleted)
     }
 
     /// Remove all cached entries.
@@ -189,8 +244,9 @@ mod tests {
 
         let entries = cache.load_all().unwrap();
         assert_eq!(entries.len(), 2);
-        assert_eq!(entries[0].retry_count, 0);
-        assert_eq!(entries[1].retry_count, 2);
+        assert_eq!(entries[0].entry.retry_count, 0);
+        assert_eq!(entries[1].entry.retry_count, 2);
+        assert!(entries[0].id < entries[1].id);
     }
 
     #[test]
@@ -223,8 +279,40 @@ mod tests {
             let cache = OfflineCache::new(&cache_path).unwrap();
             assert_eq!(cache.count().unwrap(), 1);
             let entries = cache.load_all().unwrap();
-            assert_eq!(entries[0].retry_count, 1);
+            assert_eq!(entries[0].entry.retry_count, 1);
         }
+    }
+
+    #[test]
+    fn test_cache_delete_ids() {
+        let cache = OfflineCache::in_memory().unwrap();
+
+        cache.save(&make_test_metric(), 0).unwrap();
+        cache.save(&make_test_metric(), 1).unwrap();
+        cache.save(&make_test_metric(), 2).unwrap();
+
+        assert_eq!(cache.count().unwrap(), 3);
+
+        let entries = cache.load_all().unwrap();
+        let ids_to_delete: Vec<i64> = vec![entries[0].id, entries[2].id];
+
+        let deleted = cache.delete_ids(&ids_to_delete).unwrap();
+        assert_eq!(deleted, 2);
+        assert_eq!(cache.count().unwrap(), 1);
+
+        let remaining = cache.load_all().unwrap();
+        assert_eq!(remaining.len(), 1);
+        assert_eq!(remaining[0].entry.retry_count, 1);
+    }
+
+    #[test]
+    fn test_cache_delete_ids_empty() {
+        let cache = OfflineCache::in_memory().unwrap();
+        cache.save(&make_test_metric(), 0).unwrap();
+
+        let deleted = cache.delete_ids(&[]).unwrap();
+        assert_eq!(deleted, 0);
+        assert_eq!(cache.count().unwrap(), 1);
     }
 
     #[test]
