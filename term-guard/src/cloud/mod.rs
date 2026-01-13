@@ -7,6 +7,7 @@ mod buffer;
 mod cache;
 mod client;
 mod error;
+mod repository;
 mod types;
 mod worker;
 
@@ -16,6 +17,7 @@ pub use client::{
     HealthResponse, IngestResponse, MetricsQuery, MetricsResponse, Pagination, TermCloudClient,
 };
 pub use error::{CloudError, CloudResult};
+pub use repository::TermCloudRepository;
 pub use types::{
     CloudConfig, CloudHistogram, CloudHistogramBucket, CloudMetadata, CloudMetric,
     CloudMetricValue, CloudResultKey, CloudValidationIssue, CloudValidationResult,
