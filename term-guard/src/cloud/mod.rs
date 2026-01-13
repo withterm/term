@@ -3,6 +3,7 @@
 //! This module provides integration with the Term Cloud platform,
 //! enabling centralized metrics storage, alerting, and historical analysis.
 
+mod alerting;
 mod buffer;
 mod cache;
 mod client;
@@ -23,3 +24,7 @@ pub use types::{
     CloudMetricValue, CloudResultKey, CloudValidationIssue, CloudValidationResult,
 };
 pub use worker::{UploadWorker, WorkerStats};
+
+pub use alerting::{
+    AlertDetail, AlertPayload, AlertSeverity, AlertSummary, WebhookClient, WebhookConfig,
+};
