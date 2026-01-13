@@ -3,12 +3,12 @@ use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::Mutex;
 
-use crate::cloud::{CloudError, CloudMetric, CloudResult};
+use crate::nexus::{NexusError, NexusMetric, NexusResult};
 
 /// Entry in the metrics buffer with retry metadata.
 #[derive(Debug, Clone)]
 pub struct BufferEntry {
-    pub metric: CloudMetric,
+    pub metric: NexusMetric,
     pub retry_count: u32,
     pub queued_at: Instant,
     pub ready_at: Instant,
@@ -30,11 +30,11 @@ impl MetricsBuffer {
     }
 
     /// Push a metric to the buffer.
-    pub async fn push(&self, metric: CloudMetric) -> CloudResult<()> {
+    pub async fn push(&self, metric: NexusMetric) -> NexusResult<()> {
         let mut entries = self.entries.lock().await;
 
         if entries.len() >= self.max_size {
-            return Err(CloudError::BufferOverflow {
+            return Err(NexusError::BufferOverflow {
                 pending_count: entries.len(),
                 max_size: self.max_size,
             });
@@ -55,11 +55,11 @@ impl MetricsBuffer {
     ///
     /// Increments retry count and sets `ready_at` to delay processing until
     /// the backoff period has elapsed.
-    pub async fn push_retry(&self, mut entry: BufferEntry, ready_at: Instant) -> CloudResult<()> {
+    pub async fn push_retry(&self, mut entry: BufferEntry, ready_at: Instant) -> NexusResult<()> {
         let mut entries = self.entries.lock().await;
 
         if entries.len() >= self.max_size {
-            return Err(CloudError::BufferOverflow {
+            return Err(NexusError::BufferOverflow {
                 pending_count: entries.len(),
                 max_size: self.max_size,
             });
@@ -130,17 +130,17 @@ impl Clone for MetricsBuffer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cloud::{CloudMetadata, CloudResultKey};
+    use crate::nexus::{NexusMetadata, NexusResultKey};
     use std::collections::HashMap;
 
-    fn make_test_metric() -> CloudMetric {
-        CloudMetric {
-            result_key: CloudResultKey {
+    fn make_test_metric() -> NexusMetric {
+        NexusMetric {
+            result_key: NexusResultKey {
                 dataset_date: 1704931200000,
                 tags: HashMap::new(),
             },
             metrics: HashMap::new(),
-            metadata: CloudMetadata {
+            metadata: NexusMetadata {
                 dataset_name: Some("test".to_string()),
                 start_time: None,
                 end_time: None,
@@ -173,7 +173,7 @@ mod tests {
         buffer.push(make_test_metric()).await.unwrap();
 
         let result = buffer.push(make_test_metric()).await;
-        assert!(matches!(result, Err(CloudError::BufferOverflow { .. })));
+        assert!(matches!(result, Err(NexusError::BufferOverflow { .. })));
     }
 
     #[tokio::test]

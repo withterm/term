@@ -1,46 +1,46 @@
-# How to Use the Term Cloud SDK
+# How to Use the Term Nexus SDK
 
 > **Type**: How-To Guide (Task-oriented)
 > **Audience**: Practitioners using Term
-> **Goal**: Persist validation metrics to Term Cloud for centralized monitoring and alerting
+> **Goal**: Persist validation metrics to Term Nexus for centralized monitoring
 
 ## Goal
 
-Send validation metrics from Term to Term Cloud for centralized storage, historical analysis, and webhook-based alerting.
+Send validation metrics from Term to Term Nexus for centralized storage and historical analysis.
 
 ## Prerequisites
 
 Before you begin, ensure you have:
 - [ ] Term v0.0.2 or later installed
-- [ ] A Term Cloud API key (obtain from [Term Cloud Dashboard](https://cloud.term.dev))
-- [ ] The `cloud` feature enabled in your `Cargo.toml`
+- [ ] A Term Nexus API key (obtain from [Term Dashboard](https://app.withterm.com))
+- [ ] The `nexus` feature enabled in your `Cargo.toml`
 
-## Enable the Cloud Feature
+## Enable the Nexus Feature
 
-Add the `cloud` feature to your `Cargo.toml`:
+Add the `nexus` feature to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-term-guard = { version = "0.0.2", features = ["cloud"] }
+term-guard = { version = "0.0.2", features = ["nexus"] }
 ```
 
 ## Quick Start
 
 ```rust,ignore
 use std::time::Duration;
-use term_guard::cloud::{CloudConfig, TermCloudRepository};
+use term_guard::nexus::{NexusConfig, NexusRepository};
 use term_guard::repository::{MetricsRepository, ResultKey};
 use term_guard::analyzers::AnalyzerContext;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Configure the cloud connection
-    let config = CloudConfig::new("your-api-key")
+    // Configure the nexus connection
+    let config = NexusConfig::new("your-api-key")
         .with_buffer_size(1000)
         .with_flush_interval(Duration::from_secs(5));
 
     // Create the repository
-    let repository = TermCloudRepository::new(config)?;
+    let repository = NexusRepository::new(config)?;
 
     // Create metrics with tags
     let key = ResultKey::now()
@@ -62,12 +62,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## Configuration Options
 
-The `CloudConfig` builder provides the following options:
+The `NexusConfig` builder provides the following options:
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `api_key` | Required | Your Term Cloud API key |
-| `endpoint` | `https://api.term.dev` | Custom API endpoint |
+| `api_key` | Required | Your Term Nexus API key |
+| `endpoint` | `https://api.withterm.com` | Custom API endpoint |
 | `timeout` | 30 seconds | HTTP request timeout |
 | `max_retries` | 3 | Maximum retry attempts for failed uploads |
 | `buffer_size` | 1000 | Maximum metrics to buffer in memory |
@@ -79,10 +79,10 @@ The `CloudConfig` builder provides the following options:
 
 ```rust,ignore
 use std::time::Duration;
-use term_guard::cloud::CloudConfig;
+use term_guard::nexus::NexusConfig;
 
-let config = CloudConfig::new("your-api-key")
-    .with_endpoint("https://custom.api.endpoint.com")
+let config = NexusConfig::new("your-api-key")
+    .with_endpoint("https://api.withterm.com")
     .with_timeout(Duration::from_secs(60))
     .with_max_retries(5)
     .with_buffer_size(5000)
@@ -93,7 +93,7 @@ let config = CloudConfig::new("your-api-key")
 
 ## Tagging Metrics
 
-Use `ResultKey` to add tags that help organize and filter metrics in Term Cloud:
+Use `ResultKey` to add tags that help organize and filter metrics in Term Nexus:
 
 ```rust,ignore
 use term_guard::repository::ResultKey;
@@ -127,111 +127,19 @@ Tags are validated before upload:
 - Maximum 100 tags per key
 - Control characters and null bytes are not allowed
 
-## Webhook Alerts
-
-Configure webhook notifications for validation failures:
-
-```rust,ignore
-use std::time::Duration;
-use term_guard::cloud::{
-    AlertPayload, AlertSeverity, CloudValidationResult, WebhookClient, WebhookConfig,
-};
-
-// Configure the webhook
-let webhook_config = WebhookConfig::new("https://your-webhook.example.com/alerts")
-    .with_header("Authorization", "Bearer your-token")
-    .with_min_severity(AlertSeverity::Warning)  // Only alert on Warning or Critical
-    .with_details(true)  // Include validation details
-    .with_secret("your-hmac-secret")  // HMAC-SHA256 signing
-    .with_timeout(Duration::from_secs(10));
-
-// Create the webhook client
-let webhook_client = WebhookClient::new(webhook_config)?;
-
-// Create an alert from validation results
-let validation_result = CloudValidationResult {
-    status: "error".to_string(),
-    total_checks: 10,
-    passed_checks: 7,
-    failed_checks: 3,
-    issues: vec![],  // Add specific issues here
-};
-
-let payload = AlertPayload::from_validation_result(
-    &validation_result,
-    "orders_table",
-    "production"
-).with_dashboard_url("https://cloud.term.dev/run/123");
-
-// Send the alert
-webhook_client.send(&payload).await?;
-```
-
-### Alert Severity Levels
-
-| Severity | Triggered When |
-|----------|----------------|
-| `Info` | All checks passed |
-| `Warning` | Some checks failed (less than 50%) |
-| `Critical` | Many checks failed (50%+) or status is "error" |
-
-### Webhook Payload Structure
-
-The webhook receives a JSON payload:
-
-```json
-{
-  "title": "Validation Critical: 3 of 10 checks failed",
-  "severity": "critical",
-  "dataset": "orders_table",
-  "environment": "production",
-  "summary": {
-    "total_checks": 10,
-    "passed": 7,
-    "failed": 3,
-    "status": "error"
-  },
-  "details": [
-    {
-      "check": "DataQuality",
-      "constraint": "Completeness",
-      "level": "error",
-      "message": "Column 'user_id' has 15% null values",
-      "metric": 0.85
-    }
-  ],
-  "timestamp": "2024-01-10T12:00:00Z",
-  "dashboard_url": "https://cloud.term.dev/run/123"
-}
-```
-
-### Webhook Signature Verification
-
-When `with_secret()` is configured, requests include an `X-Signature-256` header with an HMAC-SHA256 signature. Verify it server-side:
-
-```rust,ignore
-use term_guard::cloud::WebhookClient;
-
-// Verify the signature on your server
-fn verify_signature(body: &str, signature: &str, secret: &str) -> bool {
-    let expected = WebhookClient::sign_payload(body, secret);
-    format!("sha256={}", expected) == signature
-}
-```
-
 ## Offline Support
 
-The Term Cloud SDK includes an offline cache for resilience against network failures.
+The Term Nexus SDK includes an offline cache for resilience against network failures.
 
 ### Enable Offline Cache
 
 ```rust,ignore
-use term_guard::cloud::{CloudConfig, TermCloudRepository};
+use term_guard::nexus::{NexusConfig, NexusRepository};
 
-let config = CloudConfig::new("your-api-key")
+let config = NexusConfig::new("your-api-key")
     .with_offline_cache_path("/var/cache/myapp/term_metrics.db");
 
-let mut repository = TermCloudRepository::new(config)?;
+let mut repository = NexusRepository::new(config)?;
 
 // Initialize the cache (creates the SQLite database)
 repository.setup_cache(None)?;  // Uses path from config
@@ -248,7 +156,7 @@ After recovering from a network outage, sync cached metrics:
 // Check connectivity first
 match repository.health_check().await {
     Ok(response) => {
-        println!("Connected to Term Cloud v{}", response.version);
+        println!("Connected to Term Nexus v{}", response.version);
 
         // Sync any cached metrics
         let synced = repository.sync_offline_cache().await?;
@@ -273,9 +181,9 @@ match repository.health_check().await {
 Always call `shutdown()` to ensure all metrics are uploaded or cached:
 
 ```rust,ignore
-use term_guard::cloud::{CloudConfig, TermCloudRepository};
+use term_guard::nexus::{NexusConfig, NexusRepository};
 
-let repository = TermCloudRepository::new(config)?;
+let repository = NexusRepository::new(config)?;
 
 // ... save metrics ...
 
@@ -304,11 +212,11 @@ repository.flush().await?;
 ### Problem: "Offline cache not configured" error
 **Solution:** Call `setup_cache()` after creating the repository:
 ```rust,ignore
-let mut repository = TermCloudRepository::new(config)?;
+let mut repository = NexusRepository::new(config)?;
 repository.setup_cache(None)?;
 ```
 
-### Problem: Metrics not appearing in Term Cloud
+### Problem: Metrics not appearing in Term Nexus
 **Solution:**
 1. Check that you're calling `shutdown()` or `flush()` before the program exits
 2. Verify your API key is correct
@@ -317,7 +225,7 @@ repository.setup_cache(None)?;
 ### Problem: BufferOverflow error
 **Solution:** Increase the buffer size or reduce the flush interval:
 ```rust,ignore
-let config = CloudConfig::new("key")
+let config = NexusConfig::new("key")
     .with_buffer_size(10000)
     .with_flush_interval(Duration::from_secs(1));
 ```
@@ -329,18 +237,11 @@ let config = CloudConfig::new("key")
 - Values must be <= 1024 characters
 - No control characters or null bytes
 
-### Problem: Webhook not receiving alerts
-**Solution:**
-1. Verify the webhook URL is accessible
-2. Check that the alert severity meets `min_severity` threshold
-3. Ensure HTTPS certificate is valid (or use HTTP for testing)
-
 ## Security Considerations
 
 - Store API keys securely (environment variables, secrets manager)
 - API keys are never logged; they use `SecureString` internally
 - Use HTTPS endpoints in production
-- Configure webhook secrets for payload verification
 - The offline cache stores metrics locally; secure the cache file appropriately
 
 ## Related Guides

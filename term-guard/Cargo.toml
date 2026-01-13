@@ -34,8 +34,8 @@ azure = ["cloud-storage", "object_store/azure"]
 cloud-storage = ["dep:object_store", "dep:url"]
 gcs = ["cloud-storage", "object_store/gcp"]
 s3 = ["cloud-storage", "object_store/aws"]
-# Term Cloud SDK
-cloud = ["dep:directories", "dep:rand", "dep:reqwest", "dep:ring", "dep:rusqlite"]
+# Term Nexus SDK
+nexus = ["dep:directories", "dep:rand", "dep:reqwest", "dep:ring", "dep:rusqlite"]
 # Observability
 telemetry = ["dep:tracing-opentelemetry", "dep:opentelemetry", "dep:opentelemetry_sdk"]
 test-utils = ["dep:rand", "dep:parquet"]

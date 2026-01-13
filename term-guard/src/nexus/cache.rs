@@ -7,7 +7,7 @@ use std::time::Instant;
 use rusqlite::Connection;
 use tracing::warn;
 
-use crate::cloud::{BufferEntry, CloudError, CloudMetric, CloudResult};
+use crate::nexus::{BufferEntry, NexusError, NexusMetric, NexusResult};
 
 /// Entry loaded from the cache, with its database ID for selective deletion.
 #[derive(Debug)]
@@ -25,8 +25,8 @@ pub struct OfflineCache {
 
 impl OfflineCache {
     /// Create or open a cache at the given file path.
-    pub fn new(path: &Path) -> CloudResult<Self> {
-        let conn = Connection::open(path).map_err(|e| CloudError::CacheError {
+    pub fn new(path: &Path) -> NexusResult<Self> {
+        let conn = Connection::open(path).map_err(|e| NexusError::CacheError {
             message: format!("Failed to open cache database: {e}"),
         })?;
 
@@ -38,8 +38,8 @@ impl OfflineCache {
     }
 
     /// Create an in-memory cache for testing.
-    pub fn in_memory() -> CloudResult<Self> {
-        let conn = Connection::open_in_memory().map_err(|e| CloudError::CacheError {
+    pub fn in_memory() -> NexusResult<Self> {
+        let conn = Connection::open_in_memory().map_err(|e| NexusError::CacheError {
             message: format!("Failed to create in-memory cache: {e}"),
         })?;
 
@@ -50,8 +50,8 @@ impl OfflineCache {
         Ok(cache)
     }
 
-    fn init_schema(&self) -> CloudResult<()> {
-        let conn = self.conn.lock().map_err(|e| CloudError::CacheError {
+    fn init_schema(&self) -> NexusResult<()> {
+        let conn = self.conn.lock().map_err(|e| NexusError::CacheError {
             message: format!("Failed to acquire lock: {e}"),
         })?;
 
@@ -64,7 +64,7 @@ impl OfflineCache {
             )",
             [],
         )
-        .map_err(|e| CloudError::CacheError {
+        .map_err(|e| NexusError::CacheError {
             message: format!("Failed to create schema: {e}"),
         })?;
 
@@ -72,12 +72,12 @@ impl OfflineCache {
     }
 
     /// Save a metric to the cache.
-    pub fn save(&self, metric: &CloudMetric, retry_count: u32) -> CloudResult<()> {
-        let metric_json = serde_json::to_string(metric).map_err(|e| CloudError::CacheError {
+    pub fn save(&self, metric: &NexusMetric, retry_count: u32) -> NexusResult<()> {
+        let metric_json = serde_json::to_string(metric).map_err(|e| NexusError::CacheError {
             message: format!("Failed to serialize metric: {e}"),
         })?;
 
-        let conn = self.conn.lock().map_err(|e| CloudError::CacheError {
+        let conn = self.conn.lock().map_err(|e| NexusError::CacheError {
             message: format!("Failed to acquire lock: {e}"),
         })?;
 
@@ -85,7 +85,7 @@ impl OfflineCache {
             "INSERT INTO pending_metrics (metric_json, retry_count) VALUES (?1, ?2)",
             rusqlite::params![metric_json, retry_count],
         )
-        .map_err(|e| CloudError::CacheError {
+        .map_err(|e| NexusError::CacheError {
             message: format!("Failed to save metric: {e}"),
         })?;
 
@@ -95,14 +95,14 @@ impl OfflineCache {
     /// Load all pending metrics from the cache.
     ///
     /// Returns entries with their database IDs for selective deletion after successful upload.
-    pub fn load_all(&self) -> CloudResult<Vec<CacheEntry>> {
-        let conn = self.conn.lock().map_err(|e| CloudError::CacheError {
+    pub fn load_all(&self) -> NexusResult<Vec<CacheEntry>> {
+        let conn = self.conn.lock().map_err(|e| NexusError::CacheError {
             message: format!("Failed to acquire lock: {e}"),
         })?;
 
         let mut stmt = conn
             .prepare("SELECT id, metric_json, retry_count FROM pending_metrics ORDER BY id")
-            .map_err(|e| CloudError::CacheError {
+            .map_err(|e| NexusError::CacheError {
                 message: format!("Failed to prepare query: {e}"),
             })?;
 
@@ -114,11 +114,11 @@ impl OfflineCache {
                 let retry_count: u32 = row.get(2)?;
                 Ok((id, metric_json, retry_count))
             })
-            .map_err(|e| CloudError::CacheError {
+            .map_err(|e| NexusError::CacheError {
                 message: format!("Failed to query metrics: {e}"),
             })?
             .filter_map(|result| match result {
-                Ok((id, json, retry_count)) => match serde_json::from_str::<CloudMetric>(&json) {
+                Ok((id, json, retry_count)) => match serde_json::from_str::<NexusMetric>(&json) {
                     Ok(metric) => Some(CacheEntry {
                         id,
                         entry: BufferEntry {
@@ -146,12 +146,12 @@ impl OfflineCache {
     /// Delete specific entries by their database IDs.
     ///
     /// Returns the number of entries deleted.
-    pub fn delete_ids(&self, ids: &[i64]) -> CloudResult<usize> {
+    pub fn delete_ids(&self, ids: &[i64]) -> NexusResult<usize> {
         if ids.is_empty() {
             return Ok(0);
         }
 
-        let conn = self.conn.lock().map_err(|e| CloudError::CacheError {
+        let conn = self.conn.lock().map_err(|e| NexusError::CacheError {
             message: format!("Failed to acquire lock: {e}"),
         })?;
 
@@ -161,13 +161,13 @@ impl OfflineCache {
             placeholders.join(", ")
         );
 
-        let mut stmt = conn.prepare(&sql).map_err(|e| CloudError::CacheError {
+        let mut stmt = conn.prepare(&sql).map_err(|e| NexusError::CacheError {
             message: format!("Failed to prepare delete query: {e}"),
         })?;
 
         let deleted = stmt
             .execute(rusqlite::params_from_iter(ids.iter()))
-            .map_err(|e| CloudError::CacheError {
+            .map_err(|e| NexusError::CacheError {
                 message: format!("Failed to delete metrics: {e}"),
             })?;
 
@@ -175,13 +175,13 @@ impl OfflineCache {
     }
 
     /// Remove all cached entries.
-    pub fn clear(&self) -> CloudResult<()> {
-        let conn = self.conn.lock().map_err(|e| CloudError::CacheError {
+    pub fn clear(&self) -> NexusResult<()> {
+        let conn = self.conn.lock().map_err(|e| NexusError::CacheError {
             message: format!("Failed to acquire lock: {e}"),
         })?;
 
         conn.execute("DELETE FROM pending_metrics", [])
-            .map_err(|e| CloudError::CacheError {
+            .map_err(|e| NexusError::CacheError {
                 message: format!("Failed to clear cache: {e}"),
             })?;
 
@@ -189,14 +189,14 @@ impl OfflineCache {
     }
 
     /// Get count of pending metrics.
-    pub fn count(&self) -> CloudResult<usize> {
-        let conn = self.conn.lock().map_err(|e| CloudError::CacheError {
+    pub fn count(&self) -> NexusResult<usize> {
+        let conn = self.conn.lock().map_err(|e| NexusError::CacheError {
             message: format!("Failed to acquire lock: {e}"),
         })?;
 
         let count: i64 = conn
             .query_row("SELECT COUNT(*) FROM pending_metrics", [], |row| row.get(0))
-            .map_err(|e| CloudError::CacheError {
+            .map_err(|e| NexusError::CacheError {
                 message: format!("Failed to count metrics: {e}"),
             })?;
 
@@ -207,17 +207,17 @@ impl OfflineCache {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cloud::{CloudMetadata, CloudResultKey};
+    use crate::nexus::{NexusMetadata, NexusResultKey};
     use std::collections::HashMap;
 
-    fn make_test_metric() -> CloudMetric {
-        CloudMetric {
-            result_key: CloudResultKey {
+    fn make_test_metric() -> NexusMetric {
+        NexusMetric {
+            result_key: NexusResultKey {
                 dataset_date: 1704931200000,
                 tags: HashMap::new(),
             },
             metrics: HashMap::new(),
-            metadata: CloudMetadata {
+            metadata: NexusMetadata {
                 dataset_name: Some("test".to_string()),
                 start_time: None,
                 end_time: None,

@@ -1,8 +1,8 @@
 use thiserror::Error;
 
-/// Errors that can occur when interacting with Term Cloud.
+/// Errors that can occur when interacting with Term Nexus.
 #[derive(Debug, Error)]
-pub enum CloudError {
+pub enum NexusError {
     /// Authentication failed (invalid or expired API key).
     #[error("Authentication failed: {message}")]
     Authentication { message: String },
@@ -43,13 +43,13 @@ pub enum CloudError {
     Configuration { message: String },
 }
 
-impl CloudError {
+impl NexusError {
     /// Returns true if this error is transient and the operation should be retried.
     pub fn is_retryable(&self) -> bool {
         match self {
-            CloudError::Network { .. } => true,
-            CloudError::RateLimited { .. } => true,
-            CloudError::ServerError { status, .. } => *status >= 500,
+            NexusError::Network { .. } => true,
+            NexusError::RateLimited { .. } => true,
+            NexusError::ServerError { status, .. } => *status >= 500,
             _ => false,
         }
     }
@@ -57,42 +57,42 @@ impl CloudError {
     /// Returns the suggested retry delay in seconds, if available.
     pub fn retry_after(&self) -> Option<u64> {
         match self {
-            CloudError::RateLimited { retry_after_secs } => *retry_after_secs,
+            NexusError::RateLimited { retry_after_secs } => *retry_after_secs,
             _ => None,
         }
     }
 }
 
-/// Result type for cloud operations.
-pub type CloudResult<T> = std::result::Result<T, CloudError>;
+/// Result type for nexus operations.
+pub type NexusResult<T> = std::result::Result<T, NexusError>;
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_cloud_error_display() {
-        let err = CloudError::Authentication {
+    fn test_nexus_error_display() {
+        let err = NexusError::Authentication {
             message: "Invalid API key".to_string(),
         };
         assert!(err.to_string().contains("Invalid API key"));
     }
 
     #[test]
-    fn test_cloud_error_is_retryable() {
-        assert!(!CloudError::Authentication {
+    fn test_nexus_error_is_retryable() {
+        assert!(!NexusError::Authentication {
             message: "test".to_string()
         }
         .is_retryable());
-        assert!(CloudError::Network {
+        assert!(NexusError::Network {
             message: "timeout".to_string()
         }
         .is_retryable());
-        assert!(CloudError::RateLimited {
+        assert!(NexusError::RateLimited {
             retry_after_secs: Some(60)
         }
         .is_retryable());
-        assert!(CloudError::ServerError {
+        assert!(NexusError::ServerError {
             status: 500,
             message: "internal".to_string()
         }

@@ -4,12 +4,12 @@ use reqwest::Client;
 use ring::hmac;
 use serde::{Deserialize, Serialize};
 
-use crate::cloud::{CloudConfig, CloudError, CloudMetric, CloudResult, CloudResultKey};
+use crate::nexus::{NexusConfig, NexusError, NexusMetric, NexusResult, NexusResultKey};
 
-/// HTTP client for Term Cloud API.
+/// HTTP client for Term Nexus API.
 #[derive(Clone)]
-pub struct TermCloudClient {
-    config: Arc<CloudConfig>,
+pub struct NexusClient {
+    config: Arc<NexusConfig>,
     client: Client,
     signing_key: hmac::Key,
 }
@@ -48,7 +48,7 @@ pub struct MetricsQuery {
 /// Paginated response from metrics query.
 #[derive(Debug, Deserialize)]
 pub struct MetricsResponse {
-    pub results: Vec<CloudMetric>,
+    pub results: Vec<NexusMetric>,
     pub pagination: Pagination,
 }
 
@@ -58,13 +58,13 @@ pub struct Pagination {
     pub has_more: bool,
 }
 
-impl TermCloudClient {
+impl NexusClient {
     /// Create a new client with the given configuration.
-    pub fn new(config: CloudConfig) -> CloudResult<Self> {
+    pub fn new(config: NexusConfig) -> NexusResult<Self> {
         let client = Client::builder()
             .timeout(config.timeout())
             .build()
-            .map_err(|e| CloudError::Configuration {
+            .map_err(|e| NexusError::Configuration {
                 message: format!("Failed to create HTTP client: {}", e),
             })?;
 
@@ -77,8 +77,8 @@ impl TermCloudClient {
         })
     }
 
-    /// Check if the Term Cloud API is reachable.
-    pub async fn health_check(&self) -> CloudResult<HealthResponse> {
+    /// Check if the Term Nexus API is reachable.
+    pub async fn health_check(&self) -> NexusResult<HealthResponse> {
         let url = format!("{}/v1/health", self.config.endpoint());
 
         let response = self
@@ -86,17 +86,17 @@ impl TermCloudClient {
             .get(&url)
             .send()
             .await
-            .map_err(|e| CloudError::Network {
+            .map_err(|e| NexusError::Network {
                 message: e.to_string(),
             })?;
 
         self.handle_response(response).await
     }
 
-    /// Send metrics to Term Cloud.
-    pub async fn ingest(&self, metrics: &[CloudMetric]) -> CloudResult<IngestResponse> {
+    /// Send metrics to Term Nexus.
+    pub async fn ingest(&self, metrics: &[NexusMetric]) -> NexusResult<IngestResponse> {
         let url = format!("{}/v1/metrics", self.config.endpoint());
-        let body = serde_json::to_vec(metrics).map_err(|e| CloudError::Serialization {
+        let body = serde_json::to_vec(metrics).map_err(|e| NexusError::Serialization {
             message: e.to_string(),
         })?;
 
@@ -111,15 +111,15 @@ impl TermCloudClient {
             .body(body)
             .send()
             .await
-            .map_err(|e| CloudError::Network {
+            .map_err(|e| NexusError::Network {
                 message: e.to_string(),
             })?;
 
         self.handle_response(response).await
     }
 
-    /// Query metrics from Term Cloud.
-    pub async fn query(&self, query: MetricsQuery) -> CloudResult<MetricsResponse> {
+    /// Query metrics from Term Nexus.
+    pub async fn query(&self, query: MetricsQuery) -> NexusResult<MetricsResponse> {
         let url = format!("{}/v1/metrics", self.config.endpoint());
 
         let response = self
@@ -129,7 +129,7 @@ impl TermCloudClient {
             .query(&query)
             .send()
             .await
-            .map_err(|e| CloudError::Network {
+            .map_err(|e| NexusError::Network {
                 message: e.to_string(),
             })?;
 
@@ -137,7 +137,7 @@ impl TermCloudClient {
     }
 
     /// Delete metrics by key.
-    pub async fn delete(&self, key: &CloudResultKey) -> CloudResult<()> {
+    pub async fn delete(&self, key: &NexusResultKey) -> NexusResult<()> {
         let url = format!("{}/v1/metrics/{}", self.config.endpoint(), key.dataset_date);
 
         let response = self
@@ -147,7 +147,7 @@ impl TermCloudClient {
             .query(&key.tags)
             .send()
             .await
-            .map_err(|e| CloudError::Network {
+            .map_err(|e| NexusError::Network {
                 message: e.to_string(),
             })?;
 
@@ -168,14 +168,14 @@ impl TermCloudClient {
     async fn handle_response<T: serde::de::DeserializeOwned>(
         &self,
         response: reqwest::Response,
-    ) -> CloudResult<T> {
+    ) -> NexusResult<T> {
         let status = response.status();
 
         if status.is_success() {
             response
                 .json::<T>()
                 .await
-                .map_err(|e| CloudError::Serialization {
+                .map_err(|e| NexusError::Serialization {
                     message: e.to_string(),
                 })
         } else {
@@ -183,8 +183,8 @@ impl TermCloudClient {
         }
     }
 
-    /// Convert an error response to a CloudError.
-    async fn handle_error_response<T>(&self, response: reqwest::Response) -> CloudResult<T> {
+    /// Convert an error response to a NexusError.
+    async fn handle_error_response<T>(&self, response: reqwest::Response) -> NexusResult<T> {
         let status = response.status();
         let retry_after = response
             .headers()
@@ -195,16 +195,16 @@ impl TermCloudClient {
         let body = response.text().await.unwrap_or_default();
 
         match status.as_u16() {
-            401 => Err(CloudError::Authentication { message: body }),
-            429 => Err(CloudError::RateLimited {
+            401 => Err(NexusError::Authentication { message: body }),
+            429 => Err(NexusError::RateLimited {
                 retry_after_secs: retry_after,
             }),
-            400 => Err(CloudError::InvalidRequest { message: body }),
-            status if status >= 500 => Err(CloudError::ServerError {
+            400 => Err(NexusError::InvalidRequest { message: body }),
+            status if status >= 500 => Err(NexusError::ServerError {
                 status,
                 message: body,
             }),
-            _ => Err(CloudError::ServerError {
+            _ => Err(NexusError::ServerError {
                 status: status.as_u16(),
                 message: body,
             }),
@@ -212,7 +212,7 @@ impl TermCloudClient {
     }
 
     /// Get the configuration.
-    pub fn config(&self) -> &CloudConfig {
+    pub fn config(&self) -> &NexusConfig {
         &self.config
     }
 }
@@ -223,15 +223,15 @@ mod tests {
 
     #[test]
     fn test_client_creation() {
-        let config = CloudConfig::new("test-api-key");
-        let client = TermCloudClient::new(config);
+        let config = NexusConfig::new("test-api-key");
+        let client = NexusClient::new(config);
         assert!(client.is_ok());
     }
 
     #[tokio::test]
     async fn test_client_health_check_invalid_endpoint() {
-        let config = CloudConfig::new("test-key").with_endpoint("http://localhost:1");
-        let client = TermCloudClient::new(config).unwrap();
+        let config = NexusConfig::new("test-key").with_endpoint("http://localhost:1");
+        let client = NexusClient::new(config).unwrap();
 
         let result = client.health_check().await;
         assert!(result.is_err());

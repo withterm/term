@@ -6,9 +6,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::security::SecureString;
 
-/// Configuration for connecting to Term Cloud.
+/// Configuration for connecting to Term Nexus.
 #[derive(Debug, Clone)]
-pub struct CloudConfig {
+pub struct NexusConfig {
     api_key: SecureString,
     endpoint: String,
     timeout: Duration,
@@ -19,12 +19,12 @@ pub struct CloudConfig {
     offline_cache_path: Option<PathBuf>,
 }
 
-impl CloudConfig {
-    /// Create a new CloudConfig with the given API key.
+impl NexusConfig {
+    /// Create a new NexusConfig with the given API key.
     pub fn new(api_key: impl Into<String>) -> Self {
         Self {
             api_key: SecureString::new(api_key.into()),
-            endpoint: "https://api.term.dev".to_string(),
+            endpoint: "https://api.withterm.com".to_string(),
             timeout: Duration::from_secs(30),
             max_retries: 3,
             buffer_size: 1000,
@@ -121,19 +121,19 @@ impl CloudConfig {
     }
 }
 
-/// A metric ready for transmission to Term Cloud.
+/// A metric ready for transmission to Term Nexus.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CloudMetric {
-    pub result_key: CloudResultKey,
-    pub metrics: HashMap<String, CloudMetricValue>,
-    pub metadata: CloudMetadata,
+pub struct NexusMetric {
+    pub result_key: NexusResultKey,
+    pub metrics: HashMap<String, NexusMetricValue>,
+    pub metadata: NexusMetadata,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub validation_result: Option<CloudValidationResult>,
+    pub validation_result: Option<NexusValidationResult>,
 }
 
 /// Key identifying a set of metrics.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct CloudResultKey {
+pub struct NexusResultKey {
     pub dataset_date: i64,
     pub tags: HashMap<String, String>,
 }
@@ -141,7 +141,7 @@ pub struct CloudResultKey {
 /// A metric value in wire format.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "value")]
-pub enum CloudMetricValue {
+pub enum NexusMetricValue {
     #[serde(rename = "double")]
     Double(f64),
     #[serde(rename = "long")]
@@ -151,13 +151,13 @@ pub enum CloudMetricValue {
     #[serde(rename = "boolean")]
     Boolean(bool),
     #[serde(rename = "histogram")]
-    Histogram(CloudHistogram),
+    Histogram(NexusHistogram),
 }
 
 /// Histogram data in wire format.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CloudHistogram {
-    pub buckets: Vec<CloudHistogramBucket>,
+pub struct NexusHistogram {
+    pub buckets: Vec<NexusHistogramBucket>,
     pub total_count: u64,
     pub min: Option<f64>,
     pub max: Option<f64>,
@@ -167,7 +167,7 @@ pub struct CloudHistogram {
 
 /// A single histogram bucket.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CloudHistogramBucket {
+pub struct NexusHistogramBucket {
     pub lower_bound: f64,
     pub upper_bound: f64,
     pub count: u64,
@@ -175,7 +175,7 @@ pub struct CloudHistogramBucket {
 
 /// Metadata about the metrics collection.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CloudMetadata {
+pub struct NexusMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dataset_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -189,17 +189,17 @@ pub struct CloudMetadata {
 
 /// Validation result summary.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CloudValidationResult {
+pub struct NexusValidationResult {
     pub status: String,
     pub total_checks: usize,
     pub passed_checks: usize,
     pub failed_checks: usize,
-    pub issues: Vec<CloudValidationIssue>,
+    pub issues: Vec<NexusValidationIssue>,
 }
 
 /// A single validation issue.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CloudValidationIssue {
+pub struct NexusValidationIssue {
     pub check_name: String,
     pub constraint_name: String,
     pub level: String,
@@ -213,19 +213,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_cloud_config_default() {
-        let config = CloudConfig::new("test-api-key");
+    fn test_nexus_config_default() {
+        let config = NexusConfig::new("test-api-key");
 
         assert_eq!(config.api_key().expose(), "test-api-key");
-        assert_eq!(config.endpoint(), "https://api.term.dev");
+        assert_eq!(config.endpoint(), "https://api.withterm.com");
         assert_eq!(config.timeout(), Duration::from_secs(30));
         assert_eq!(config.max_retries(), 3);
         assert_eq!(config.buffer_size(), 1000);
     }
 
     #[test]
-    fn test_cloud_config_builder() {
-        let config = CloudConfig::new("key")
+    fn test_nexus_config_builder() {
+        let config = NexusConfig::new("key")
             .with_endpoint("https://custom.endpoint")
             .with_timeout(Duration::from_secs(60))
             .with_max_retries(5)
@@ -240,7 +240,7 @@ mod tests {
     #[test]
     fn test_api_key_not_leaked_in_debug() {
         let secret_key = "super-secret-api-key-12345";
-        let config = CloudConfig::new(secret_key);
+        let config = NexusConfig::new(secret_key);
 
         let debug_output = format!("{:?}", config);
 
@@ -256,24 +256,24 @@ mod tests {
 
     #[test]
     fn test_offline_cache_path_with_pathbuf() {
-        let config = CloudConfig::new("key").with_offline_cache_path("/tmp/cache");
+        let config = NexusConfig::new("key").with_offline_cache_path("/tmp/cache");
 
         assert_eq!(config.offline_cache_path(), Some(Path::new("/tmp/cache")));
     }
 
     #[test]
-    fn test_cloud_metric_serialization() {
-        let metric = CloudMetric {
-            result_key: CloudResultKey {
+    fn test_nexus_metric_serialization() {
+        let metric = NexusMetric {
+            result_key: NexusResultKey {
                 dataset_date: 1704931200000,
                 tags: vec![("env".to_string(), "prod".to_string())]
                     .into_iter()
                     .collect(),
             },
-            metrics: vec![("completeness.id".to_string(), CloudMetricValue::Double(1.0))]
+            metrics: vec![("completeness.id".to_string(), NexusMetricValue::Double(1.0))]
                 .into_iter()
                 .collect(),
-            metadata: CloudMetadata {
+            metadata: NexusMetadata {
                 dataset_name: Some("orders".to_string()),
                 start_time: Some("2024-01-10T12:00:00Z".to_string()),
                 end_time: Some("2024-01-10T12:05:00Z".to_string()),

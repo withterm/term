@@ -1,6 +1,6 @@
-//! TermCloudRepository - Main repository implementation for Term Cloud.
+//! NexusRepository - Main repository implementation for Term Nexus.
 //!
-//! This module provides the primary interface for persisting metrics to Term Cloud,
+//! This module provides the primary interface for persisting metrics to Term Nexus,
 //! implementing the MetricsRepository trait with support for:
 //! - Asynchronous background uploads via UploadWorker
 //! - Offline operation with automatic sync via OfflineCache
@@ -9,12 +9,12 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use term_guard::cloud::{CloudConfig, TermCloudRepository};
+//! use term_guard::nexus::{NexusConfig, NexusRepository};
 //! use term_guard::repository::ResultKey;
 //! use term_guard::analyzers::AnalyzerContext;
 //!
-//! let config = CloudConfig::new("your-api-key");
-//! let repository = TermCloudRepository::new(config)?;
+//! let config = NexusConfig::new("your-api-key");
+//! let repository = NexusRepository::new(config)?;
 //!
 //! // Save metrics
 //! let key = ResultKey::now().with_tag("env", "production");
@@ -36,17 +36,17 @@ use tracing::{debug, error, info, instrument, warn};
 
 use crate::analyzers::context::AnalyzerContext;
 use crate::analyzers::types::MetricValue;
-use crate::cloud::{
-    BufferEntry, CloudConfig, CloudError, CloudMetadata, CloudMetric, CloudMetricValue,
-    CloudResult, CloudResultKey, MetricsBuffer, OfflineCache, TermCloudClient, UploadWorker,
-    WorkerStats,
-};
 use crate::error::{Result, TermError};
+use crate::nexus::{
+    BufferEntry, MetricsBuffer, NexusClient, NexusConfig, NexusError, NexusHistogram,
+    NexusHistogramBucket, NexusMetadata, NexusMetric, NexusMetricValue, NexusResult,
+    NexusResultKey, OfflineCache, UploadWorker, WorkerStats,
+};
 use crate::repository::{MetricsQuery, MetricsRepository, RepositoryMetadata, ResultKey};
 
-/// Main repository implementation for persisting metrics to Term Cloud.
+/// Main repository implementation for persisting metrics to Term Nexus.
 ///
-/// TermCloudRepository provides a complete solution for metrics persistence with:
+/// NexusRepository provides a complete solution for metrics persistence with:
 /// - Local buffering for high-throughput scenarios
 /// - Background upload worker for asynchronous transmission
 /// - Offline cache for resilience against network failures
@@ -66,31 +66,31 @@ use crate::repository::{MetricsQuery, MetricsRepository, RepositoryMetadata, Res
 ///          │
 ///          ▼
 /// ┌─────────────────┐     ┌─────────────────┐
-/// │  UploadWorker   │────▶│  TermCloudClient │
+/// │  UploadWorker   │────▶│   NexusClient   │
 /// └────────┬────────┘     └────────┬────────┘
 ///          │                       │
 ///          │ (on failure)          │
 ///          ▼                       ▼
 /// ┌─────────────────┐     ┌─────────────────┐
-/// │  OfflineCache   │     │   Term Cloud    │
+/// │  OfflineCache   │     │   Term Nexus    │
 /// │    (SQLite)     │     │      API        │
 /// └─────────────────┘     └─────────────────┘
 /// ```
-pub struct TermCloudRepository {
-    config: Arc<CloudConfig>,
-    client: TermCloudClient,
+pub struct NexusRepository {
+    config: Arc<NexusConfig>,
+    client: NexusClient,
     buffer: MetricsBuffer,
     cache: Option<OfflineCache>,
     shutdown_tx: watch::Sender<bool>,
     worker_handle: Option<RwLock<Option<tokio::task::JoinHandle<WorkerStats>>>>,
 }
 
-impl TermCloudRepository {
-    /// Creates a new TermCloudRepository and starts the background upload worker.
+impl NexusRepository {
+    /// Creates a new NexusRepository and starts the background upload worker.
     ///
     /// # Arguments
     ///
-    /// * `config` - Configuration for connecting to Term Cloud
+    /// * `config` - Configuration for connecting to Term Nexus
     ///
     /// # Errors
     ///
@@ -99,25 +99,25 @@ impl TermCloudRepository {
     /// # Example
     ///
     /// ```rust,ignore
-    /// use term_guard::cloud::{CloudConfig, TermCloudRepository};
+    /// use term_guard::nexus::{NexusConfig, NexusRepository};
     ///
-    /// let config = CloudConfig::new("your-api-key")
+    /// let config = NexusConfig::new("your-api-key")
     ///     .with_buffer_size(5000)
     ///     .with_batch_size(100);
     ///
-    /// let repository = TermCloudRepository::new(config)?;
+    /// let repository = NexusRepository::new(config)?;
     /// ```
     #[instrument(skip(config), fields(endpoint = %config.endpoint()))]
-    pub fn new(config: CloudConfig) -> CloudResult<Self> {
+    pub fn new(config: NexusConfig) -> NexusResult<Self> {
         let config = Arc::new(config);
-        let client = TermCloudClient::new((*config).clone())?;
+        let client = NexusClient::new((*config).clone())?;
         let buffer = MetricsBuffer::new(config.buffer_size());
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
         let worker = UploadWorker::new((*config).clone(), buffer.clone(), shutdown_rx)?;
         let worker_handle = tokio::spawn(async move { worker.run().await });
 
-        info!("TermCloudRepository initialized with background worker");
+        info!("NexusRepository initialized with background worker");
 
         Ok(Self {
             config,
@@ -145,7 +145,7 @@ impl TermCloudRepository {
     /// # Example
     ///
     /// ```rust,ignore
-    /// let mut repository = TermCloudRepository::new(config)?;
+    /// let mut repository = NexusRepository::new(config)?;
     ///
     /// // Use default cache location
     /// repository.setup_cache(None)?;
@@ -154,7 +154,7 @@ impl TermCloudRepository {
     /// repository.setup_cache(Some("/var/cache/myapp/metrics.db"))?;
     /// ```
     #[instrument(skip(self, path))]
-    pub fn setup_cache(&mut self, path: Option<&Path>) -> CloudResult<()> {
+    pub fn setup_cache(&mut self, path: Option<&Path>) -> NexusResult<()> {
         let cache_path = if let Some(p) = path {
             p.to_path_buf()
         } else if let Some(p) = self.config.offline_cache_path() {
@@ -164,7 +164,7 @@ impl TermCloudRepository {
         };
 
         if let Some(parent) = cache_path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| CloudError::CacheError {
+            std::fs::create_dir_all(parent).map_err(|e| NexusError::CacheError {
                 message: format!("Failed to create cache directory: {e}"),
             })?;
         }
@@ -176,10 +176,10 @@ impl TermCloudRepository {
     }
 
     /// Returns the default platform-specific cache path.
-    fn default_cache_path() -> CloudResult<std::path::PathBuf> {
+    fn default_cache_path() -> NexusResult<std::path::PathBuf> {
         ProjectDirs::from("dev", "term", "term-guard")
             .map(|dirs| dirs.cache_dir().join("metrics.db"))
-            .ok_or_else(|| CloudError::Configuration {
+            .ok_or_else(|| NexusError::Configuration {
                 message: "Could not determine cache directory".to_string(),
             })
     }
@@ -213,7 +213,7 @@ impl TermCloudRepository {
     /// repository.flush().await?;
     /// ```
     #[instrument(skip(self))]
-    pub async fn flush(&self) -> CloudResult<()> {
+    pub async fn flush(&self) -> NexusResult<()> {
         let entries = self.buffer.clear().await;
         if entries.is_empty() {
             return Ok(());
@@ -242,12 +242,12 @@ impl TermCloudRepository {
     /// println!("Uploaded {} metrics during operation", stats.metrics_uploaded);
     /// ```
     #[instrument(skip(self))]
-    pub async fn shutdown(&self) -> CloudResult<Option<WorkerStats>> {
+    pub async fn shutdown(&self) -> NexusResult<Option<WorkerStats>> {
         info!("Initiating graceful shutdown");
 
         self.shutdown_tx
             .send(true)
-            .map_err(|e| CloudError::Configuration {
+            .map_err(|e| NexusError::Configuration {
                 message: format!("Failed to send shutdown signal: {e}"),
             })?;
 
@@ -284,7 +284,7 @@ impl TermCloudRepository {
         Ok(stats)
     }
 
-    /// Checks connectivity to Term Cloud.
+    /// Checks connectivity to Term Nexus.
     ///
     /// # Errors
     ///
@@ -294,16 +294,16 @@ impl TermCloudRepository {
     ///
     /// ```rust,ignore
     /// match repository.health_check().await {
-    ///     Ok(response) => println!("Connected to Term Cloud v{}", response.version),
+    ///     Ok(response) => println!("Connected to Term Nexus v{}", response.version),
     ///     Err(e) => eprintln!("Connection failed: {}", e),
     /// }
     /// ```
     #[instrument(skip(self))]
-    pub async fn health_check(&self) -> CloudResult<crate::cloud::HealthResponse> {
+    pub async fn health_check(&self) -> NexusResult<crate::nexus::HealthResponse> {
         self.client.health_check().await
     }
 
-    /// Synchronizes offline cached metrics to Term Cloud.
+    /// Synchronizes offline cached metrics to Term Nexus.
     ///
     /// Loads all cached metrics and attempts to upload them. Successfully
     /// uploaded metrics are removed from the cache.
@@ -324,11 +324,11 @@ impl TermCloudRepository {
     /// println!("Synced {} cached metrics", synced);
     /// ```
     #[instrument(skip(self))]
-    pub async fn sync_offline_cache(&self) -> CloudResult<usize> {
+    pub async fn sync_offline_cache(&self) -> NexusResult<usize> {
         let cache = self
             .cache
             .as_ref()
-            .ok_or_else(|| CloudError::Configuration {
+            .ok_or_else(|| NexusError::Configuration {
                 message: "Offline cache not configured".to_string(),
             })?;
 
@@ -369,49 +369,47 @@ impl TermCloudRepository {
         Ok(synced)
     }
 
-    /// Converts a ResultKey and AnalyzerContext to a CloudMetric.
-    fn to_cloud_metric(key: &ResultKey, context: &AnalyzerContext) -> CloudMetric {
-        let mut cloud_metrics = HashMap::new();
+    /// Converts a ResultKey and AnalyzerContext to a NexusMetric.
+    fn to_nexus_metric(key: &ResultKey, context: &AnalyzerContext) -> NexusMetric {
+        let mut nexus_metrics = HashMap::new();
 
         for (metric_key, value) in context.all_metrics() {
-            let cloud_value = match value {
-                MetricValue::Double(v) => CloudMetricValue::Double(*v),
-                MetricValue::Long(v) => CloudMetricValue::Long(*v),
-                MetricValue::String(v) => CloudMetricValue::String(v.clone()),
-                MetricValue::Boolean(v) => CloudMetricValue::Boolean(*v),
-                MetricValue::Histogram(h) => {
-                    CloudMetricValue::Histogram(crate::cloud::CloudHistogram {
-                        buckets: h
-                            .buckets
-                            .iter()
-                            .map(|b| crate::cloud::CloudHistogramBucket {
-                                lower_bound: b.lower_bound,
-                                upper_bound: b.upper_bound,
-                                count: b.count,
-                            })
-                            .collect(),
-                        total_count: h.total_count,
-                        min: h.min,
-                        max: h.max,
-                        mean: h.mean,
-                        std_dev: h.std_dev,
-                    })
-                }
+            let nexus_value = match value {
+                MetricValue::Double(v) => NexusMetricValue::Double(*v),
+                MetricValue::Long(v) => NexusMetricValue::Long(*v),
+                MetricValue::String(v) => NexusMetricValue::String(v.clone()),
+                MetricValue::Boolean(v) => NexusMetricValue::Boolean(*v),
+                MetricValue::Histogram(h) => NexusMetricValue::Histogram(NexusHistogram {
+                    buckets: h
+                        .buckets
+                        .iter()
+                        .map(|b| NexusHistogramBucket {
+                            lower_bound: b.lower_bound,
+                            upper_bound: b.upper_bound,
+                            count: b.count,
+                        })
+                        .collect(),
+                    total_count: h.total_count,
+                    min: h.min,
+                    max: h.max,
+                    mean: h.mean,
+                    std_dev: h.std_dev,
+                }),
                 MetricValue::Vector(_) | MetricValue::Map(_) => {
                     continue;
                 }
             };
-            cloud_metrics.insert(metric_key.clone(), cloud_value);
+            nexus_metrics.insert(metric_key.clone(), nexus_value);
         }
 
         let metadata = context.metadata();
-        CloudMetric {
-            result_key: CloudResultKey {
+        NexusMetric {
+            result_key: NexusResultKey {
                 dataset_date: key.timestamp,
                 tags: key.tags.clone(),
             },
-            metrics: cloud_metrics,
-            metadata: CloudMetadata {
+            metrics: nexus_metrics,
+            metadata: NexusMetadata {
                 dataset_name: metadata.dataset_name.clone(),
                 start_time: metadata.start_time.map(|t| t.to_rfc3339()),
                 end_time: metadata.end_time.map(|t| t.to_rfc3339()),
@@ -422,9 +420,9 @@ impl TermCloudRepository {
         }
     }
 
-    /// Uploads entries directly to Term Cloud.
-    async fn upload_entries(&self, entries: Vec<BufferEntry>) -> CloudResult<()> {
-        let metrics: Vec<CloudMetric> = entries.iter().map(|e| e.metric.clone()).collect();
+    /// Uploads entries directly to Term Nexus.
+    async fn upload_entries(&self, entries: Vec<BufferEntry>) -> NexusResult<()> {
+        let metrics: Vec<NexusMetric> = entries.iter().map(|e| e.metric.clone()).collect();
 
         match self.client.ingest(&metrics).await {
             Ok(response) => {
@@ -444,37 +442,37 @@ impl TermCloudRepository {
     }
 
     /// Saves entries to the offline cache.
-    fn save_to_cache(&self, entries: &[BufferEntry]) -> CloudResult<()> {
+    fn save_to_cache(&self, entries: &[BufferEntry]) -> NexusResult<()> {
         if let Some(ref cache) = self.cache {
             for entry in entries {
                 cache.save(&entry.metric, entry.retry_count)?;
             }
             Ok(())
         } else {
-            Err(CloudError::CacheError {
+            Err(NexusError::CacheError {
                 message: "Offline cache not configured, metrics will be lost".to_string(),
             })
         }
     }
 
     /// Returns a reference to the underlying client.
-    pub fn client(&self) -> &TermCloudClient {
+    pub fn client(&self) -> &NexusClient {
         &self.client
     }
 
     /// Returns a reference to the configuration.
-    pub fn config(&self) -> &CloudConfig {
+    pub fn config(&self) -> &NexusConfig {
         &self.config
     }
 }
 
 #[async_trait]
-impl MetricsRepository for TermCloudRepository {
+impl MetricsRepository for NexusRepository {
     /// Saves metrics to the buffer for asynchronous upload.
     ///
     /// Metrics are buffered locally and uploaded by the background worker.
     /// If the buffer is full, returns a BufferOverflow error.
-    #[instrument(skip(self, metrics), fields(key.timestamp = %key.timestamp, repository_type = "term_cloud"))]
+    #[instrument(skip(self, metrics), fields(key.timestamp = %key.timestamp, repository_type = "nexus"))]
     async fn save(&self, key: ResultKey, metrics: AnalyzerContext) -> Result<()> {
         if let Err(validation_error) = key.validate_tags() {
             return Err(TermError::repository_validation(
@@ -484,39 +482,39 @@ impl MetricsRepository for TermCloudRepository {
             ));
         }
 
-        let cloud_metric = Self::to_cloud_metric(&key, &metrics);
+        let nexus_metric = Self::to_nexus_metric(&key, &metrics);
 
         self.buffer
-            .push(cloud_metric)
+            .push(nexus_metric)
             .await
-            .map_err(|e| TermError::repository("term_cloud", "save", e.to_string()))?;
+            .map_err(|e| TermError::repository("nexus", "save", e.to_string()))?;
 
         debug!("Metric queued for upload");
         Ok(())
     }
 
-    /// Creates a query builder for retrieving metrics from Term Cloud.
+    /// Creates a query builder for retrieving metrics from Term Nexus.
     ///
-    /// Note: Query execution requires network access to Term Cloud.
+    /// Note: Query execution requires network access to Term Nexus.
     #[instrument(skip(self))]
     async fn load(&self) -> MetricsQuery {
-        MetricsQuery::new(Arc::new(TermCloudQueryAdapter {
+        MetricsQuery::new(Arc::new(NexusQueryAdapter {
             client: self.client.clone(),
         }))
     }
 
-    /// Deletes metrics by key from Term Cloud.
-    #[instrument(skip(self), fields(key.timestamp = %key.timestamp, repository_type = "term_cloud"))]
+    /// Deletes metrics by key from Term Nexus.
+    #[instrument(skip(self), fields(key.timestamp = %key.timestamp, repository_type = "nexus"))]
     async fn delete(&self, key: ResultKey) -> Result<()> {
-        let cloud_key = CloudResultKey {
+        let nexus_key = NexusResultKey {
             dataset_date: key.timestamp,
             tags: key.tags.clone(),
         };
 
         self.client
-            .delete(&cloud_key)
+            .delete(&nexus_key)
             .await
-            .map_err(|e| TermError::repository("term_cloud", "delete", e.to_string()))
+            .map_err(|e| TermError::repository("nexus", "delete", e.to_string()))
     }
 
     /// Returns metadata about the repository.
@@ -529,20 +527,20 @@ impl MetricsRepository for TermCloudRepository {
             .map(|c| c.count().unwrap_or(0))
             .unwrap_or(0);
 
-        Ok(RepositoryMetadata::new("term_cloud")
+        Ok(RepositoryMetadata::new("nexus")
             .with_config("endpoint", self.config.endpoint())
             .with_config("pending_metrics", pending.to_string())
             .with_config("cached_metrics", cached.to_string()))
     }
 }
 
-/// Adapter for executing queries via TermCloudClient.
-struct TermCloudQueryAdapter {
-    client: TermCloudClient,
+/// Adapter for executing queries via NexusClient.
+struct NexusQueryAdapter {
+    client: NexusClient,
 }
 
 #[async_trait]
-impl MetricsRepository for TermCloudQueryAdapter {
+impl MetricsRepository for NexusQueryAdapter {
     async fn save(&self, _key: ResultKey, _metrics: AnalyzerContext) -> Result<()> {
         Err(TermError::NotSupported(
             "save not supported on query adapter".to_string(),
@@ -562,12 +560,12 @@ impl MetricsRepository for TermCloudQueryAdapter {
     }
 
     async fn list_keys(&self) -> Result<Vec<ResultKey>> {
-        let query = crate::cloud::MetricsQuery::default();
+        let query = crate::nexus::MetricsQuery::default();
         let response = self
             .client
             .query(query)
             .await
-            .map_err(|e| TermError::repository("term_cloud", "list_keys", e.to_string()))?;
+            .map_err(|e| TermError::repository("nexus", "list_keys", e.to_string()))?;
 
         Ok(response
             .results
@@ -577,7 +575,7 @@ impl MetricsRepository for TermCloudQueryAdapter {
     }
 
     async fn get(&self, key: &ResultKey) -> Result<Option<AnalyzerContext>> {
-        let query = crate::cloud::MetricsQuery {
+        let query = crate::nexus::MetricsQuery {
             after: Some(key.timestamp),
             before: Some(key.timestamp + 1),
             tags: key.tags.clone(),
@@ -589,17 +587,17 @@ impl MetricsRepository for TermCloudQueryAdapter {
             .client
             .query(query)
             .await
-            .map_err(|e| TermError::repository("term_cloud", "get", e.to_string()))?;
+            .map_err(|e| TermError::repository("nexus", "get", e.to_string()))?;
 
         Ok(response.results.into_iter().next().map(|m| {
             let mut context = AnalyzerContext::new();
             for (metric_key, value) in m.metrics {
                 let metric_value = match value {
-                    CloudMetricValue::Double(v) => MetricValue::Double(v),
-                    CloudMetricValue::Long(v) => MetricValue::Long(v),
-                    CloudMetricValue::String(v) => MetricValue::String(v),
-                    CloudMetricValue::Boolean(v) => MetricValue::Boolean(v),
-                    CloudMetricValue::Histogram(_) => continue,
+                    NexusMetricValue::Double(v) => MetricValue::Double(v),
+                    NexusMetricValue::Long(v) => MetricValue::Long(v),
+                    NexusMetricValue::String(v) => MetricValue::String(v),
+                    NexusMetricValue::Boolean(v) => MetricValue::Boolean(v),
+                    NexusMetricValue::Histogram(_) => continue,
                 };
                 context.store_metric(metric_key, metric_value);
             }
@@ -613,8 +611,8 @@ mod tests {
     use super::*;
     use std::time::Duration;
 
-    fn make_test_config() -> CloudConfig {
-        CloudConfig::new("test-api-key")
+    fn make_test_config() -> NexusConfig {
+        NexusConfig::new("test-api-key")
             .with_endpoint("http://localhost:1")
             .with_buffer_size(100)
             .with_flush_interval(Duration::from_millis(50))
@@ -623,14 +621,14 @@ mod tests {
     #[tokio::test]
     async fn test_repository_creation() {
         let config = make_test_config();
-        let result = TermCloudRepository::new(config);
+        let result = NexusRepository::new(config);
         assert!(result.is_ok());
     }
 
     #[tokio::test]
     async fn test_repository_save_queues_metric() {
         let config = make_test_config();
-        let repository = TermCloudRepository::new(config).unwrap();
+        let repository = NexusRepository::new(config).unwrap();
 
         let key = ResultKey::new(1704931200000).with_tag("env", "test");
         let context = AnalyzerContext::new();
@@ -646,7 +644,7 @@ mod tests {
     #[tokio::test]
     async fn test_repository_save_validates_tags() {
         let config = make_test_config();
-        let repository = TermCloudRepository::new(config).unwrap();
+        let repository = NexusRepository::new(config).unwrap();
 
         let key = ResultKey::new(1704931200000).with_tag("", "invalid");
         let context = AnalyzerContext::new();
@@ -660,7 +658,7 @@ mod tests {
     #[tokio::test]
     async fn test_repository_pending_count() {
         let config = make_test_config();
-        let repository = TermCloudRepository::new(config).unwrap();
+        let repository = NexusRepository::new(config).unwrap();
 
         assert_eq!(repository.pending_count().await, 0);
 
@@ -678,7 +676,7 @@ mod tests {
     #[tokio::test]
     async fn test_repository_shutdown_returns_stats() {
         let config = make_test_config();
-        let repository = TermCloudRepository::new(config).unwrap();
+        let repository = NexusRepository::new(config).unwrap();
 
         let result = repository.shutdown().await;
         assert!(result.is_ok());
@@ -687,10 +685,10 @@ mod tests {
     #[tokio::test]
     async fn test_repository_metadata() {
         let config = make_test_config();
-        let repository = TermCloudRepository::new(config).unwrap();
+        let repository = NexusRepository::new(config).unwrap();
 
         let metadata = repository.metadata().await.unwrap();
-        assert_eq!(metadata.backend_type, Some("term_cloud".to_string()));
+        assert_eq!(metadata.backend_type, Some("nexus".to_string()));
         assert!(metadata.config.contains_key("endpoint"));
         assert!(metadata.config.contains_key("pending_metrics"));
 
@@ -698,7 +696,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_to_cloud_metric_conversion() {
+    async fn test_to_nexus_metric_conversion() {
         let key = ResultKey::new(1704931200000)
             .with_tag("env", "prod")
             .with_tag("region", "us-east-1");
@@ -708,26 +706,26 @@ mod tests {
         context.store_metric("size", MetricValue::Long(1000));
         context.store_metric("is_valid", MetricValue::Boolean(true));
 
-        let cloud_metric = TermCloudRepository::to_cloud_metric(&key, &context);
+        let nexus_metric = NexusRepository::to_nexus_metric(&key, &context);
 
-        assert_eq!(cloud_metric.result_key.dataset_date, 1704931200000);
+        assert_eq!(nexus_metric.result_key.dataset_date, 1704931200000);
         assert_eq!(
-            cloud_metric.result_key.tags.get("env"),
+            nexus_metric.result_key.tags.get("env"),
             Some(&"prod".to_string())
         );
         assert_eq!(
-            cloud_metric.metadata.dataset_name,
+            nexus_metric.metadata.dataset_name,
             Some("test_dataset".to_string())
         );
-        assert!(cloud_metric.metrics.contains_key("completeness.col1"));
-        assert!(cloud_metric.metrics.contains_key("size"));
-        assert!(cloud_metric.metrics.contains_key("is_valid"));
+        assert!(nexus_metric.metrics.contains_key("completeness.col1"));
+        assert!(nexus_metric.metrics.contains_key("size"));
+        assert!(nexus_metric.metrics.contains_key("is_valid"));
     }
 
     #[tokio::test]
     async fn test_repository_cache_setup() {
         let config = make_test_config();
-        let mut repository = TermCloudRepository::new(config).unwrap();
+        let mut repository = NexusRepository::new(config).unwrap();
 
         let temp_dir = tempfile::tempdir().unwrap();
         let cache_path = temp_dir.path().join("test_cache.db");
@@ -741,7 +739,7 @@ mod tests {
     #[tokio::test]
     async fn test_repository_flush() {
         let config = make_test_config();
-        let mut repository = TermCloudRepository::new(config).unwrap();
+        let mut repository = NexusRepository::new(config).unwrap();
 
         let temp_dir = tempfile::tempdir().unwrap();
         let cache_path = temp_dir.path().join("flush_test.db");
@@ -764,7 +762,7 @@ mod tests {
     #[tokio::test]
     async fn test_repository_sync_without_cache() {
         let config = make_test_config();
-        let repository = TermCloudRepository::new(config).unwrap();
+        let repository = NexusRepository::new(config).unwrap();
 
         let result = repository.sync_offline_cache().await;
         assert!(result.is_err());
@@ -775,7 +773,7 @@ mod tests {
     #[tokio::test]
     async fn test_repository_sync_empty_cache() {
         let config = make_test_config();
-        let mut repository = TermCloudRepository::new(config).unwrap();
+        let mut repository = NexusRepository::new(config).unwrap();
 
         let temp_dir = tempfile::tempdir().unwrap();
         let cache_path = temp_dir.path().join("sync_test.db");
@@ -790,7 +788,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_default_cache_path() {
-        let result = TermCloudRepository::default_cache_path();
+        let result = NexusRepository::default_cache_path();
         assert!(result.is_ok());
         let path = result.unwrap();
         assert!(path.to_string_lossy().contains("term"));

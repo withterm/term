@@ -5,13 +5,13 @@ use tokio::sync::watch;
 use tokio::time::interval;
 use tracing::{debug, error, info, instrument, warn};
 
-use crate::cloud::{
-    BufferEntry, CloudConfig, CloudError, CloudMetric, CloudResult, MetricsBuffer, TermCloudClient,
+use crate::nexus::{
+    BufferEntry, MetricsBuffer, NexusClient, NexusConfig, NexusError, NexusMetric, NexusResult,
 };
 
-/// Background worker for uploading metrics to Term Cloud.
+/// Background worker for uploading metrics to Term Nexus.
 pub struct UploadWorker {
-    client: TermCloudClient,
+    client: NexusClient,
     buffer: MetricsBuffer,
     shutdown: watch::Receiver<bool>,
     batch_size: usize,
@@ -34,13 +34,13 @@ impl UploadWorker {
     ///
     /// # Errors
     ///
-    /// Returns an error if the cloud client cannot be created.
+    /// Returns an error if the nexus client cannot be created.
     pub fn new(
-        config: CloudConfig,
+        config: NexusConfig,
         buffer: MetricsBuffer,
         shutdown: watch::Receiver<bool>,
-    ) -> CloudResult<Self> {
-        let client = TermCloudClient::new(config.clone())?;
+    ) -> NexusResult<Self> {
+        let client = NexusClient::new(config.clone())?;
 
         Ok(Self {
             batch_size: config.batch_size(),
@@ -110,7 +110,7 @@ impl UploadWorker {
 
     /// Upload a batch of metrics, handling retries.
     async fn upload_batch(&mut self, entries: Vec<BufferEntry>) {
-        let metrics: Vec<CloudMetric> = entries.iter().map(|e| e.metric.clone()).collect();
+        let metrics: Vec<NexusMetric> = entries.iter().map(|e| e.metric.clone()).collect();
         let batch_size = entries.len() as u64;
 
         match self.client.ingest(&metrics).await {
@@ -142,7 +142,7 @@ impl UploadWorker {
     /// Re-queues entries with a `ready_at` timestamp calculated via exponential
     /// backoff. The buffer's `drain()` method respects this timestamp, ensuring
     /// entries are not retried until their backoff period has elapsed.
-    async fn handle_retry(&mut self, entries: Vec<BufferEntry>, error: &CloudError) {
+    async fn handle_retry(&mut self, entries: Vec<BufferEntry>, error: &NexusError) {
         let retry_after = error.retry_after();
 
         for entry in entries {
@@ -182,7 +182,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_worker_shutdown() {
-        let config = CloudConfig::new("test-key")
+        let config = NexusConfig::new("test-key")
             .with_endpoint("http://localhost:1")
             .with_flush_interval(Duration::from_millis(100));
 
@@ -203,7 +203,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_worker_returns_stats() {
-        let config = CloudConfig::new("test-key")
+        let config = NexusConfig::new("test-key")
             .with_endpoint("http://localhost:1")
             .with_flush_interval(Duration::from_millis(50));
 
@@ -226,7 +226,7 @@ mod tests {
 
     #[test]
     fn test_calculate_backoff() {
-        let config = CloudConfig::new("test-key").with_endpoint("http://localhost:1");
+        let config = NexusConfig::new("test-key").with_endpoint("http://localhost:1");
 
         let (_, shutdown_rx) = watch::channel(false);
         let buffer = MetricsBuffer::new(100);
@@ -251,7 +251,7 @@ mod tests {
 
     #[test]
     fn test_calculate_backoff_uses_retry_after() {
-        let config = CloudConfig::new("test-key").with_endpoint("http://localhost:1");
+        let config = NexusConfig::new("test-key").with_endpoint("http://localhost:1");
 
         let (_, shutdown_rx) = watch::channel(false);
         let buffer = MetricsBuffer::new(100);
