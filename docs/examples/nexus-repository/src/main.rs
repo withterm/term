@@ -32,7 +32,12 @@ async fn main() -> Result<()> {
     println!("Connecting to Term Nexus...");
 
     // Step 2: Create repository and verify connectivity
-    let repository = NexusRepository::new(config)?;
+    let mut repository = NexusRepository::new(config)?;
+
+    // Set up offline cache for resilience (optional but recommended)
+    if let Err(e) = repository.setup_cache(None) {
+        println!("Note: Offline cache not available: {}", e);
+    }
 
     match repository.health_check().await {
         Ok(health) => {
@@ -191,7 +196,7 @@ async fn main() -> Result<()> {
                 // Compare with previous run
                 // Default sort is descending, so index 0 is current run, index 1 is previous
                 if metrics.len() > 1 {
-                    if let Some((_, current_ctx)) = metrics.get(0) {
+                    if let Some((_, current_ctx)) = metrics.first() {
                         if let Some(MetricValue::Long(current_passed)) =
                             current_ctx.get_metric("validation.passed_checks")
                         {
