@@ -157,7 +157,77 @@ async fn main() -> Result<()> {
     repository.flush().await?;
     println!("Metrics uploaded to Nexus\n");
 
-    // Step 9: Graceful shutdown
+    // Step 9: Query historical metrics
+    println!("--- Querying Historical Metrics ---\n");
+
+    // Load recent metrics for this dataset
+    let query = repository.load().await;
+    let historical = query
+        .with_tag("dataset", "items")
+        .with_tag("pipeline", "daily-inventory")
+        .after(Utc::now().timestamp_millis() - 86400000) // Last 24 hours
+        .limit(10)
+        .execute()
+        .await;
+
+    match historical {
+        Ok(metrics) => {
+            if metrics.is_empty() {
+                println!("No historical metrics found (this is the first run)");
+            } else {
+                println!("Found {} historical result(s):\n", metrics.len());
+
+                for (key, ctx) in &metrics {
+                    println!("  Timestamp: {}", key.timestamp);
+                    println!("  Tags: {:?}", key.tags);
+
+                    // Show key metrics
+                    if let Some(passed) = ctx.get_metric("validation.passed_checks") {
+                        println!("  Passed checks: {:?}", passed);
+                    }
+                    println!();
+                }
+
+                // Compare with previous run
+                // Default sort is descending, so index 0 is current run, index 1 is previous
+                if metrics.len() > 1 {
+                    if let Some((_, current_ctx)) = metrics.get(0) {
+                        if let Some(MetricValue::Long(current_passed)) =
+                            current_ctx.get_metric("validation.passed_checks")
+                        {
+                            if let Some((prev_key, prev_ctx)) = metrics.get(1) {
+                                println!("--- Comparison with Previous Run ---\n");
+                                println!("Previous run timestamp: {}", prev_key.timestamp);
+
+                                if let Some(MetricValue::Long(prev_passed)) =
+                                    prev_ctx.get_metric("validation.passed_checks")
+                                {
+                                    let diff = *current_passed as f64 - *prev_passed as f64;
+                                    if diff > 0.0 {
+                                        println!("Improvement: {} more checks passing", diff);
+                                    } else if diff < 0.0 {
+                                        println!("Regression: {} fewer checks passing", diff.abs());
+                                    } else {
+                                        println!("No change in passing checks");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    println!("Only one run found - no previous run to compare with");
+                }
+            }
+        }
+        Err(e) => {
+            println!("Could not query historical metrics: {}", e);
+            println!("(This is expected if the Nexus API doesn't support queries yet)");
+        }
+    }
+
+    println!();
+
+    // Step 10: Graceful shutdown
     let stats = repository.shutdown().await?;
     if let Some(s) = stats {
         println!(
