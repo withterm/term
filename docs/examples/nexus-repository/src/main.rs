@@ -95,9 +95,11 @@ async fn main() -> Result<()> {
         ValidationResult::Success { metrics, report } => {
             (metrics.passed_checks, metrics.total_checks, report)
         }
-        ValidationResult::Failure { report } => {
-            (report.metrics.passed_checks, report.metrics.total_checks, report)
-        }
+        ValidationResult::Failure { report } => (
+            report.metrics.passed_checks,
+            report.metrics.total_checks,
+            report,
+        ),
     };
 
     println!(
@@ -131,14 +133,8 @@ async fn main() -> Result<()> {
     let mut context = AnalyzerContext::with_dataset("items");
 
     // Store summary metrics
-    context.store_metric(
-        "validation.passed_checks",
-        MetricValue::Long(passed as i64),
-    );
-    context.store_metric(
-        "validation.total_checks",
-        MetricValue::Long(total as i64),
-    );
+    context.store_metric("validation.passed_checks", MetricValue::Long(passed as i64));
+    context.store_metric("validation.total_checks", MetricValue::Long(total as i64));
     context.store_metric(
         "validation.success_rate",
         MetricValue::Double(if total > 0 {
@@ -149,10 +145,24 @@ async fn main() -> Result<()> {
     );
 
     // Store issue count by level
-    let error_count = report.issues.iter().filter(|i| i.level == Level::Error).count();
-    let warning_count = report.issues.iter().filter(|i| i.level == Level::Warning).count();
-    context.store_metric("validation.error_count", MetricValue::Long(error_count as i64));
-    context.store_metric("validation.warning_count", MetricValue::Long(warning_count as i64));
+    let error_count = report
+        .issues
+        .iter()
+        .filter(|i| i.level == Level::Error)
+        .count();
+    let warning_count = report
+        .issues
+        .iter()
+        .filter(|i| i.level == Level::Warning)
+        .count();
+    context.store_metric(
+        "validation.error_count",
+        MetricValue::Long(error_count as i64),
+    );
+    context.store_metric(
+        "validation.warning_count",
+        MetricValue::Long(warning_count as i64),
+    );
 
     // Save to Nexus
     repository.save(result_key.clone(), context).await?;
