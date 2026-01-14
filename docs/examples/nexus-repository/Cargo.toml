@@ -1,0 +1,13 @@
+[package]
+name = "nexus-repository-example"
+version = "0.0.1"
+edition = "2021"
+
+[workspace]
+
+[dependencies]
+term-guard = { path = "../../../term-guard", features = ["nexus"] }
+tokio = { version = "1.0", features = ["full"] }
+datafusion = "50.3"
+anyhow = "1.0"
+chrono = "0.4"

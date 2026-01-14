@@ -45,3 +45,9 @@ CLAUDE.md
 
 # Logs directory
 logs/
+
+# Implementation plans (not checked in)
+docs/plans/
+
+# Node.js bindings (build artifacts)
+node/

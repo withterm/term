@@ -1,0 +1,11 @@
+id,name,description,priority,category,price,quantity,in_stock
+1,Widget A,High quality widget,high,electronics,29.99,100,true
+2,Widget B,Standard widget,medium,electronics,19.99,250,true
+3,Gadget X,Premium gadget,high,gadgets,49.99,50,true
+4,Gadget Y,,low,gadgets,9.99,500,true
+5,Tool Alpha,Professional tool,high,tools,99.99,25,true
+6,Tool Beta,Basic tool,medium,tools,24.99,150,true
+7,,Missing name item,low,misc,4.99,1000,true
+8,Item 8,Regular item,medium,misc,14.99,200,false
+9,Item 9,Another item,low,misc,7.99,300,true
+10,Premium Z,Top tier product,high,premium,199.99,10,true

@@ -28,11 +28,15 @@ postgres = ["database", "datafusion-table-providers/postgres"]
 mysql = ["database", "datafusion-table-providers/mysql"]
 sqlite = ["database", "datafusion-table-providers/sqlite"]
 all-databases = ["postgres", "mysql", "sqlite"]
+# Cloud storage features (S3, GCS, Azure)
 all-cloud = ["s3", "gcs", "azure"]
 azure = ["cloud-storage", "object_store/azure"]
 cloud-storage = ["dep:object_store", "dep:url"]
 gcs = ["cloud-storage", "object_store/gcp"]
 s3 = ["cloud-storage", "object_store/aws"]
+# Term Nexus SDK
+nexus = ["dep:directories", "dep:rand", "dep:reqwest", "dep:ring", "dep:rusqlite"]
+# Observability
 telemetry = ["dep:tracing-opentelemetry", "dep:opentelemetry", "dep:opentelemetry_sdk"]
 test-utils = ["dep:rand", "dep:parquet"]
 
@@ -42,8 +46,9 @@ async-trait = "0.1"
 base64 = "0.22"
 chrono = {version = "0.4", features = ["serde"]}
 datafusion = "50.3"
-futures = "0.3"
 datafusion-table-providers = { version = "0.8.2", optional = true }
+directories = { version = "5.0", optional = true }
+futures = "0.3"
 glob = "0.3"
 hex = "0.4"
 num_cpus = "1.16"
@@ -54,6 +59,9 @@ opentelemetry_sdk = {version = "0.31", optional = true}
 parquet = {version = "56.2", optional = true}
 rand = {version = "0.9", optional = true}
 regex = "1"
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], optional = true }
+ring = { version = "0.17", optional = true }
+rusqlite = { version = "0.32", features = ["bundled"], optional = true }
 serde = {version = "1", features = ["derive"]}
 serde_json = "1"
 sha2 = "0.10"

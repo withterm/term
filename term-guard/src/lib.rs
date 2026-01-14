@@ -171,6 +171,8 @@ pub mod core;
 pub mod error;
 pub mod formatters;
 pub mod logging;
+#[cfg(feature = "nexus")]
+pub mod nexus;
 pub mod optimizer;
 pub mod prelude;
 pub mod repository;
